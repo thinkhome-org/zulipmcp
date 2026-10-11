@@ -33,6 +33,7 @@ async def test_authenticated_http_read_only_discovery_and_execution(tmp_path):
             store, AuthConfig("https://mcp.example/mcp", "https://zulip.example")
         ),
         Executor(read_only=True, transport=httpx.MockTransport(upstream)),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),
