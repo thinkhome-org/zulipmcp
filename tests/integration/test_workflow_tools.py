@@ -47,6 +47,7 @@ async def test_http_workflows_bind_caller_and_stop_batch_on_revocation(tmp_path)
             store, AuthConfig("https://mcp.example/mcp", "https://zulip.example")
         ),
         Executor(transport=httpx.MockTransport(upstream)),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),

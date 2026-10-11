@@ -352,3 +352,31 @@ async def test_attachment_path_converter_rejects_traversal(filename):
         {"realm_id_str": 1, "filename": filename},
     )
     assert result.error["code"] == "invalid_arguments"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation, argument, path",
+    [
+        ("get-user-groups", "include_deactivated_groups", "/api/v1/user_groups"),
+        ("get-channel-folders", "include_archived", "/api/v1/channel_folders"),
+    ],
+)
+async def test_zulip_get_form_schemas_are_sent_as_query_parameters(
+    operation, argument, path
+):
+    from thinkhome_zulip_mcp.executor import Executor, Principal
+
+    def upstream(request):
+        assert request.method == "GET"
+        assert request.url.path == path
+        assert request.url.params[argument] == "true"
+        assert request.content == b""
+        return httpx.Response(200, json={"result": "success"})
+
+    result = await Executor(transport=httpx.MockTransport(upstream)).execute(
+        Principal("alice", "https://zulip.example", "alice", "synthetic"),
+        operation,
+        {argument: True},
+    )
+    assert result.error is None

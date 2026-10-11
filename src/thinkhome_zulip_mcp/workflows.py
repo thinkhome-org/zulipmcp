@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -63,30 +64,49 @@ async def history_page(
     cursor: int | None = None,
     direction: str = "older",
     limit: int = 100,
+    anchor_date: str | None = None,
+    apply_markdown: bool | None = None,
 ) -> OperationResult:
     if (
         direction not in {"older", "newer"}
+        or (apply_markdown is not None and type(apply_markdown) is not bool)
+        or (anchor_date is not None and cursor is not None)
         or type(limit) is not int
         or not 1 <= limit <= 200
         or (cursor is not None and (type(cursor) is not int or cursor < 1))
     ):
         return OperationResult(str(uuid4()), error={"code": "invalid_history_request"})
+    if anchor_date is not None:
+        try:
+            date = datetime.fromisoformat(anchor_date)
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=UTC)
+            anchor_date = date.astimezone(UTC).isoformat()
+        except (ValueError, TypeError, OverflowError):
+            return OperationResult(
+                str(uuid4()), error={"code": "invalid_history_request"}
+            )
     older = direction == "older"
-    result = await executor.execute(
-        principal,
-        "get-messages",
-        {
-            "anchor": str(cursor)
-            if cursor is not None
-            else "newest"
-            if older
-            else "oldest",
-            "include_anchor": False,
-            "num_before": limit if older else 0,
-            "num_after": 0 if older else limit,
-            "narrow": narrow,
-        },
-    )
+    adjacent = limit - 1 if anchor_date is not None else limit
+    arguments: dict[str, Any] = {
+        "anchor": "date"
+        if anchor_date is not None
+        else str(cursor)
+        if cursor is not None
+        else "newest"
+        if older
+        else "oldest",
+        "include_anchor": anchor_date is not None,
+        "num_before": adjacent if older else 0,
+        "num_after": 0 if older else adjacent,
+        "narrow": narrow,
+        "allow_empty_topic_name": True,
+    }
+    if anchor_date is not None:
+        arguments["anchor_date"] = anchor_date
+    if apply_markdown is not None:
+        arguments["apply_markdown"] = apply_markdown
+    result = await executor.execute(principal, "get-messages", arguments)
     if result.error:
         return result
     data = result.data
@@ -111,7 +131,37 @@ async def history_page(
             valid = valid and all(
                 mid < cursor if older else mid > cursor for mid in ids
             )
-    if not valid or type(exhausted) is not bool or (not messages and not exhausted):
+    traversal = ids
+    if executor.channel_policy.active:
+        page = data.get("policy_page") if isinstance(data, dict) else None
+        if not isinstance(page, dict) or type(page.get("count")) is not int:
+            valid = False
+        else:
+            count, first, last = (
+                page["count"],
+                page.get("first_id"),
+                page.get("last_id"),
+            )
+            if count == 0:
+                valid = valid and not ids and first is None and last is None
+                traversal = []
+            elif (
+                not len(ids) <= count <= limit
+                or type(first) is not int
+                or type(last) is not int
+                or first < 1
+                or last < first
+                or (count == 1) != (first == last)
+            ):
+                valid = False
+            else:
+                traversal = [first, last]
+                valid = valid and all(first <= mid <= last for mid in ids)
+                if cursor is not None:
+                    valid = valid and all(
+                        mid < cursor if older else mid > cursor for mid in traversal
+                    )
+    if not valid or type(exhausted) is not bool or (not traversal and not exhausted):
         return OperationResult(
             result.request_id, error={"code": "invalid_history_response"}
         )
@@ -119,7 +169,9 @@ async def history_page(
         result.request_id,
         data={
             **data,
-            "next_cursor": (ids[0] if older else ids[-1]) if ids else cursor,
+            "next_cursor": (traversal[0] if older else traversal[-1])
+            if traversal
+            else cursor,
             "exhausted": exhausted,
             "direction": direction,
         },
