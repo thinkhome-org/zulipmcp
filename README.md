@@ -35,7 +35,9 @@ Responses are limited to 8 MiB by default. Up to three attempts are allowed only
 for explicitly audited safe reads; a `Retry-After` longer than 30 seconds is
 returned to the client without retrying earlier. Writes are never retried.
 
-Multipart/file transfers and alternative authentication still require adapters.
+Multipart uploads support staged handles through authenticated HTTP routes or
+stdio allowed-root import; see [file transfers](docs/file-transfers.md).
+Downloading existing Zulip attachments and alternative authentication remain pending.
 No live Zulip or production operation has been verified; protocol tests use
 disposable local HTTP and ASGI fixtures.
 

@@ -119,8 +119,9 @@ Multipart execution now accepts staged owner-bound handles for all seven upload
 schemas (attachment, emoji, own avatar, realm icon/logo, bot create/update).
 Contract tests verify method/path, representative encoded fields and exact file
 bytes. These are HTTPX boundary checks, not complete parameter or live-handler
-certification. File staging is currently an internal API; MCP/HTTP staging and
-download endpoints and server lifecycle cleanup are still pending.
+certification. Authenticated HTTP staging/retrieval/deletion, stdio allowed-root import and
+server lifecycle cleanup are implemented. Downloading existing Zulip attachments
+via signed URLs remains pending.
 
 Other pending adapters include binary downloads, cookie/session authentication,
 credentials-retrieval flows and server-to-server endpoints. Authenticated

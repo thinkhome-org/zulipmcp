@@ -132,8 +132,9 @@ actual Zulip integration remain pending; Task 4 is not complete.
 
 **Partial evidence:** internal FileStore and multipart executor cover owner binding,
 15-minute handle expiry, bounded streaming, local path/symlink checks and seven
-multipart schemas. Public staging/download endpoints and server lifecycle cleanup
-remain pending; Task 5 is not complete.
+multipart schemas. Authenticated HTTP staging/retrieval/deletion, stdio local
+import and lifecycle cleanup are implemented. Downloads from Zulip via signed
+URLs remain pending; Task 5 is not complete.
 
 ## Úloha 6 — Události a praktické pracovní nástroje
 

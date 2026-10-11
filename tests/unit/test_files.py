@@ -132,3 +132,44 @@ async def test_special_local_files_and_header_injection_are_rejected(tmp_path: P
             await files.stage(ALICE, "bad\r\nname", "text/plain", chunks(b"x"))
         with pytest.raises(FileAccessError):
             await files.stage(ALICE, "a", "text/plain\r\nX-Evil: true", chunks(b"x"))
+
+
+def test_file_limits_from_environment(monkeypatch):
+    from thinkhome_zulip_mcp.files import file_store_from_environment
+
+    monkeypatch.setenv("MCP_FILE_MAX_BYTES", "10")
+    monkeypatch.setenv("MCP_FILE_MAX_TOTAL_BYTES", "20")
+    monkeypatch.setenv("MCP_FILE_MAX_HANDLES", "2")
+    with file_store_from_environment() as files:
+        assert (files.max_bytes, files.max_total_bytes, files.max_files) == (10, 20, 2)
+        assert files.allowed_root is None
+    for invalid in ("0", "-1", "invalid"):
+        monkeypatch.setenv("MCP_FILE_MAX_BYTES", invalid)
+        with pytest.raises(ValueError):
+            file_store_from_environment()
+
+
+@pytest.mark.asyncio
+async def test_background_expiration_removes_files(tmp_path, monkeypatch):
+    import asyncio
+
+    import thinkhome_zulip_mcp.files as module
+
+    now = [0.0]
+    calls = 0
+
+    async def tick(seconds):
+        nonlocal calls
+        assert seconds == 30
+        calls += 1
+        if calls == 1:
+            now[0] = 901.0
+        else:
+            raise asyncio.CancelledError
+
+    with FileStore(parent=tmp_path, clock=lambda: now[0]) as files:
+        await files.stage(ALICE, "a", "text/plain", chunks(b"abc"))
+        monkeypatch.setattr(module.asyncio, "sleep", tick)
+        with pytest.raises(asyncio.CancelledError):
+            await files.cleanup_loop()
+        assert list(files.directory.iterdir()) == []

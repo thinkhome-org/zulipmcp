@@ -1,6 +1,9 @@
 """MCP tools share a catalog executor and never accept identity overrides."""
 
+import asyncio
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
@@ -22,6 +25,8 @@ from starlette.routing import Route
 from thinkhome_zulip_mcp.auth import Authenticator
 from thinkhome_zulip_mcp.catalog import resolve_reference
 from thinkhome_zulip_mcp.executor import Executor, Principal
+from thinkhome_zulip_mcp.file_http import file_routes
+from thinkhome_zulip_mcp.files import FileStore
 from thinkhome_zulip_mcp.store import AuthenticationError
 
 
@@ -73,10 +78,26 @@ def create_server(
             }
         )
     executor = executor or Executor()
+
+    @asynccontextmanager
+    async def lifespan(_: MCPServer[Any]) -> AsyncIterator[dict[str, Any]]:
+        files = executor.files
+        task = asyncio.create_task(files.cleanup_loop()) if files else None
+        try:
+            yield {}
+        finally:
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            if files:
+                files.close()
+
     server: MCPServer[Any] = MCPServer(
         "ThinkHome Zulip MCP",
         version=version("thinkhome-zulip-mcp"),
         log_level="WARNING",
+        lifespan=lifespan,
         auth=auth_settings,
         token_verifier=authenticator,
         instructions=(
@@ -88,6 +109,20 @@ def create_server(
     local_read = ToolAnnotations(
         read_only_hint=True, destructive_hint=False, open_world_hint=False
     )
+
+    if principal is not None and executor.files and executor.files.allowed_root:
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                read_only_hint=False,
+                destructive_hint=False,
+                open_world_hint=False,
+            )
+        )
+        async def zulip_stage_file(path: str) -> dict[str, Any]:
+            """Stage a relative file under the configured allowed root."""
+            assert executor.files is not None
+            return asdict(await executor.files.import_local(current_principal(), path))
 
     @server.tool(annotations=local_read)
     def zulip_search_operations(
@@ -150,6 +185,7 @@ def create_server(
             "method": op.method,
             "path": op.path,
             "inputs": inputs,
+            "binary_input": "Staged handles; see zulip_capabilities.file_transfer",
             "references": references,
             "metadata": definition.get("x-thinkhome", {}),
             "parameter_audit": definition.get("x-thinkhome-parameter-audit", {}),
@@ -190,9 +226,25 @@ def create_server(
             "full_coverage": False,
             "catalog_operations": len(executor.catalog),
             "max_response_bytes": executor.max_response_bytes,
+            "file_transfer": {
+                "max_bytes": executor.files.max_bytes,
+                "max_total_bytes": executor.files.max_total_bytes,
+                "max_handles": executor.files.max_files,
+                "expires_in_seconds": 900,
+                "local_staging": principal is not None
+                and executor.files.allowed_root is not None,
+                "http_path": urlsplit(authenticator.config.resource_url).path.rstrip(
+                    "/"
+                )
+                + "/files"
+                if authenticator
+                else None,
+            }
+            if executor.files
+            else None,
             "limitations": [
                 "API source audit incomplete",
-                "Multipart/file adapters pending",
+                "Downloading files from Zulip is pending",
                 "Alternate authentication adapters pending",
                 "Per-operation wire and live integration coverage incomplete",
             ],
@@ -204,8 +256,16 @@ def create_server(
 def create_http_app(
     authenticator: Authenticator, executor: Executor | None = None
 ) -> Starlette:
+    executor = executor or Executor()
+    if executor.files is None:
+        executor.files = FileStore()
     server = create_server(executor=executor, authenticator=authenticator)
     resource = urlsplit(authenticator.config.resource_url)
+    security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[resource.netloc],
+        allowed_origins=[f"{resource.scheme}://{resource.netloc}"],
+    )
     app = server.streamable_http_app(
         streamable_http_path=resource.path,
         json_response=True,
@@ -213,11 +273,15 @@ def create_http_app(
         max_request_body_size=1024 * 1024,
         max_sessions=1000,
         session_idle_timeout=1800,
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=True,
-            allowed_hosts=[resource.netloc],
-            allowed_origins=[f"{resource.scheme}://{resource.netloc}"],
-        ),
+        transport_security=security,
+    )
+    app.router.routes.extend(
+        file_routes(
+            authenticator,
+            executor.files,
+            resource.path.rstrip("/") + "/files",
+            security,
+        )
     )
     if authenticator.config.issuer is None:
         # Manual-only mode must not advertise a nonexistent OAuth authorization server.

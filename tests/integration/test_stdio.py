@@ -133,3 +133,36 @@ async def test_stdio_execute_reaches_only_the_configured_test_server(tmp_path):
         upstream.shutdown()
         upstream.server_close()
         thread.join(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_stdio_stages_only_files_under_configured_root(tmp_path):
+    root = tmp_path / "allowed"
+    root.mkdir()
+    (root / "hello.txt").write_bytes(b"hello")
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "thinkhome_zulip_mcp", "serve", "--transport", "stdio"],
+        env={
+            "ZULIP_URL": "https://unused.example.invalid",
+            "ZULIP_EMAIL": "test@example.invalid",
+            "ZULIP_API_KEY": "synthetic",
+            "ZULIP_FILE_ROOT": str(root),
+            "TMPDIR": str(runtime),
+        },
+    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            assert "zulip_stage_file" in {tool.name for tool in tools.tools}
+            result = await session.call_tool("zulip_stage_file", {"path": "hello.txt"})
+            assert not result.is_error
+            assert result.structured_content["size"] == 5
+            assert result.structured_content["filename"] == "hello.txt"
+            assert len(result.structured_content["handle"]) > 30
+            denied = await session.call_tool("zulip_stage_file", {"path": "../outside"})
+            assert denied.is_error
+    assert list(runtime.glob("zulip-mcp-*")) == []

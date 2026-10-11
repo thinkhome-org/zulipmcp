@@ -1,10 +1,32 @@
 # File transfer backend (development)
 
-The internal `FileStore` and multipart executor adapter are implemented. Public
-HTTP staging/download routes, stdio staging tools, signed URL downloads and
-server-managed cleanup are the next integration step. Existing CLI configurations
-do not yet create a FileStore. This document describes the backend contract, not
-a ready-to-use client upload flow.
+HTTP staging, retrieval/deletion of staged files, stdio local import and multipart
+execution are implemented. Fetching existing attachments from Zulip via signed
+URLs remains pending.
+
+## Client flow
+
+HTTP clients use the same bearer token as MCP:
+
+| Request | Result |
+|---|---|
+| `POST /mcp/files?filename=example.png` with raw bytes and `Content-Type` | 201 JSON: handle, filename, content_type, size, expires_at |
+| `GET /mcp/files/{handle}` | Owner-only attachment bytes |
+| `DELETE /mcp/files/{handle}` | 204; invalid/expired/other-owner handles return 404 |
+
+The prefix follows the configured `MCP_RESOURCE_URL` path. Uploads are bounded
+while streaming and time out after 60 seconds. Oversized uploads return 413.
+Host/Origin checks and token scope/revocation checks also apply to these routes.
+Pass the returned handle to the binary parameter of `zulip_execute`.
+
+For stdio, set `ZULIP_FILE_ROOT` to an allowed directory before starting the server.
+This enables `zulip_stage_file(path)` with a relative path under that directory.
+HTTP never exposes this local-path tool. Without an allowed root, stdio local
+staging is disabled.
+
+Optional positive-integer environment limits: `MCP_FILE_MAX_BYTES`,
+`MCP_FILE_MAX_TOTAL_BYTES`, `MCP_FILE_MAX_HANDLES`. Defaults are listed below.
+`zulip_capabilities` reports the active limits and staging path.
 
 ## Ownership and bounds
 
@@ -19,9 +41,11 @@ Default limits are 25 MiB per file, 100 MiB stored/in-flight bytes in total, and
 failed stream removes its partial file and releases quota. Filenames and content
 types reject header-control characters. Bytes are stored unchanged in mode-0600
 files under a private temporary directory. Filenames never become storage paths.
-Use `close()`/the context manager to remove the store at shutdown. Background
-expiration and graceful server shutdown integration are still pending; merely
-creating the backend does not schedule a cleanup task.
+The server removes expired files every 30 seconds and closes the store during
+graceful shutdown. Expired handles are rejected immediately on access. Abrupt
+termination cannot run cleanup; host temporary-directory cleanup must remove
+abandoned files. Standalone backend callers must use `close()` or the context
+manager themselves.
 
 ## Local import
 
