@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/zulip/zulip",
+  "stable_tag": "12.3",
+  "stable_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+  "main_commit": "d7c57ed15b82b0bc8aefe2007f5ee2abeebd0ea2",
+  "retrieved_at": "2026-10-11",
+  "source_path": "zerver/openapi/zulip.yaml",
+  "schema_sha256": "15c17a2d53da572191f064722102d819c200c63a5ee7d0fe20da3dcdfd74cec5",
+  "upstream_license": "Apache-2.0",
+  "audit_status": "in-progress"
+}
