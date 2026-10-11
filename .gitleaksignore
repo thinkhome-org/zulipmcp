@@ -1,0 +1,10 @@
+# Public examples in the checksum-pinned Apache-2.0 Zulip schema only.
+# Pin: b31982251ff82d0b02e59f63ad21f19204e37aea; see data/provenance.json.
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:jwt:143
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:210
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:4792
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:12116
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:26706
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:26755
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:26930
+75f05393aebc6fb74f46b2bbb5900bb5893a8d25:src/thinkhome_zulip_mcp/data/zulip.yaml:generic-api-key:30055

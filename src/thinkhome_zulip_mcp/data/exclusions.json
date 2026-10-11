@@ -1,0 +1,14 @@
+{
+  "/real-time": {
+    "reason": "Synthetic documentation schema, not a callable route",
+    "evidence": "zerver/tests/test_openapi.py:241-249; api_docs/real-time-events.md:57"
+  },
+  "/rest-error-handling": {
+    "reason": "Synthetic documentation schema for error responses",
+    "evidence": "zerver/tests/test_openapi.py:241-249"
+  },
+  "/zulip-outgoing-webhook": {
+    "reason": "Outgoing webhook payload schema, not an inbound callable API route",
+    "evidence": "zerver/tests/test_openapi.py:241-249"
+  }
+}
