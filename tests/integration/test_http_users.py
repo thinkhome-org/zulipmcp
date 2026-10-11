@@ -50,6 +50,7 @@ async def test_user_discovery_is_caller_scoped_and_profile_rechecks_revocation(
             channel_policy=ChannelPolicy(jd_enabled=True),
             transport=httpx.MockTransport(upstream),
         ),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),

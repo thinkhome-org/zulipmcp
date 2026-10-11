@@ -75,6 +75,7 @@ async def test_http_channel_policy_covers_generic_batch_and_caller_history(tmp_p
             ),
             transport=httpx.MockTransport(upstream),
         ),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),

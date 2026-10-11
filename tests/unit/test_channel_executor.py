@@ -412,3 +412,125 @@ async def test_channel_scoped_reads_check_metadata_before_fetch(
     assert len(calls) == (1 if private else 2)
     if private:
         assert result.error["code"] == "channel_policy_denied"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["stream", "channel"])
+@pytest.mark.parametrize("allowed", [True, False])
+async def test_typing_checks_channel_write_access(kind, allowed):
+    calls = []
+    policy = ChannelPolicy.from_environment(
+        {"BOT_ALLOWED_WRITE_STREAMS": "30 Work" if allowed else "Elsewhere"}
+    )
+
+    def upstream(request):
+        calls.append(request)
+        if request.method == "GET":
+            assert request.url.path.endswith("/streams/7")
+            return httpx.Response(
+                200,
+                json={
+                    "result": "success",
+                    "stream": {
+                        "stream_id": 7,
+                        "name": "30 Work",
+                        "invite_only": False,
+                    },
+                },
+            )
+        assert request.url.path.endswith("/typing")
+        assert b"stream_id=7" in request.content
+        return httpx.Response(200, json={"result": "success"})
+
+    executor = Executor(channel_policy=policy, transport=httpx.MockTransport(upstream))
+    result = await executor.execute(
+        CALLER,
+        "set-typing-status",
+        {
+            "type": kind,
+            "stream_id": 7,
+            "topic": "",
+            "op": "start",
+        },
+    )
+    if allowed:
+        assert result.error is None
+        assert len(calls) == 2
+    else:
+        assert result.error["code"] == "channel_policy_denied"
+        assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("explicit", [True, False])
+@pytest.mark.parametrize("allowed", [True, False])
+async def test_typing_direct_default_respects_dm_policy(explicit, allowed):
+    calls = []
+    policy = ChannelPolicy.from_environment(
+        {
+            "ZULIPCHAT_CHANNEL_FILTER_ENABLED": "true",
+            "ZULIPCHAT_EXCLUDE_DMS": "false" if allowed else "true",
+        }
+    )
+
+    def upstream(request):
+        calls.append(request)
+        assert request.method == "POST"
+        return httpx.Response(200, json={"result": "success"})
+
+    arguments = {"to": [2], "op": "stop"}
+    if explicit:
+        arguments["type"] = "direct"
+    result = await Executor(
+        channel_policy=policy, transport=httpx.MockTransport(upstream)
+    ).execute(CALLER, "set-typing-status", arguments)
+    assert (result.error is None) == allowed
+    assert len(calls) == int(allowed)
+    if not allowed:
+        assert result.error["code"] == "channel_policy_denied"
+
+
+@pytest.mark.asyncio
+async def test_typing_read_only_rejects_before_metadata_lookup():
+    def upstream(request):
+        pytest.fail("read-only typing reached upstream")
+
+    result = await Executor(
+        read_only=True, channel_policy=POLICY, transport=httpx.MockTransport(upstream)
+    ).execute(
+        CALLER,
+        "set-typing-status",
+        {
+            "type": "stream",
+            "stream_id": 7,
+            "topic": "x",
+            "op": "start",
+        },
+    )
+    assert result.error["code"] == "read_only_policy"
+
+
+@pytest.mark.asyncio
+async def test_custom_emoji_metadata_available_with_channel_policy_and_read_only():
+    def upstream(request):
+        assert request.method == "GET"
+        assert request.url.path.endswith("/realm/emoji")
+        assert (
+            request.headers["authorization"]
+            == httpx.BasicAuth("alice", "synthetic")._auth_header
+        )
+        return httpx.Response(
+            200,
+            json={
+                "result": "success",
+                "emoji": {
+                    "1": {"name": "robot_ear", "deactivated": False, "id": "1"},
+                },
+            },
+        )
+
+    result = await Executor(
+        channel_policy=POLICY, read_only=True, transport=httpx.MockTransport(upstream)
+    ).execute(CALLER, "get-custom-emoji", {})
+    assert result.error is None
+    assert result.data["emoji"]["1"]["name"] == "robot_ear"
