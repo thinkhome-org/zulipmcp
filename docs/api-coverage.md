@@ -120,10 +120,12 @@ schemas (attachment, emoji, own avatar, realm icon/logo, bot create/update).
 Contract tests verify method/path, representative encoded fields and exact file
 bytes. These are HTTPX boundary checks, not complete parameter or live-handler
 certification. Authenticated HTTP staging/retrieval/deletion, stdio allowed-root import and
-server lifecycle cleanup are implemented. Downloading existing Zulip attachments
-via signed URLs remains pending.
+server lifecycle cleanup are implemented. Signed-URL attachment downloads use
+caller authorization, credential-free bounded transfer and configured storage
+origins. The temporary-URL operation now accepts audited nested filename paths.
+These behaviors are fixture-tested; live Zulip/storage acceptance is pending.
 
-Other pending adapters include binary downloads, cookie/session authentication,
+Other pending adapters include cookie/session authentication,
 credentials-retrieval flows and server-to-server endpoints. Authenticated
 multi-user HTTP and the real Keycloak PKCE/network fixture are implemented;
 actual Zulip integration is still missing. The complete release gate remains false.

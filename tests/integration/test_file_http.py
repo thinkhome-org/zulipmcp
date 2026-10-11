@@ -24,6 +24,7 @@ async def test_authenticated_file_roundtrip_isolation_limits_and_cleanup(tmp_pat
             store, AuthConfig("https://mcp.example/mcp", "https://zulip.example")
         ),
         Executor(files=files),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),
@@ -85,3 +86,79 @@ async def test_authenticated_file_roundtrip_isolation_limits_and_cleanup(tmp_pat
             await client.post("/mcp/files?filename=x", headers=alice, content=b"x")
         ).status_code == 401
     assert not files.directory.exists()
+
+
+@pytest.mark.asyncio
+async def test_download_tool_stages_owned_bytes_for_http_retrieval(tmp_path):
+    store = IdentityStore(tmp_path / "db", Fernet.generate_key())
+    store.add_identity(Principal("a", "https://zulip.example", "a", "synthetic"))
+    token = store.issue_token("a", expires_at=int(time.time()) + 100)
+
+    def upstream(request):
+        if request.url.path.startswith("/api/v1/"):
+            return httpx.Response(
+                200,
+                json={"result": "success", "url": "/user_uploads/temporary/TOKEN/name"},
+            )
+        assert "authorization" not in request.headers
+        return httpx.Response(200, content=b"attachment")
+
+    app = create_http_app(
+        Authenticator(
+            store, AuthConfig("https://mcp.example/mcp", "https://zulip.example")
+        ),
+        Executor(
+            files=FileStore(parent=tmp_path), transport=httpx.MockTransport(upstream)
+        ),
+        json_response=True,
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="https://mcp.example"
+        ) as client,
+    ):
+        headers = {
+            "authorization": f"Bearer {token}",
+            "accept": "application/json, text/event-stream",
+        }
+        response = await client.post(
+            "/mcp",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            },
+        )
+        headers["mcp-session-id"] = response.headers["mcp-session-id"]
+        headers["mcp-protocol-version"] = response.json()["result"]["protocolVersion"]
+        await client.post(
+            "/mcp",
+            headers=headers,
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        )
+        response = await client.post(
+            "/mcp",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "zulip_download_file",
+                    "arguments": {"realm_id_str": 1, "filename": "ab/name"},
+                },
+            },
+        )
+        result = response.json()["result"]
+        assert not result.get("isError"), result
+        handle = result["structuredContent"]["data"]["handle"]
+        assert (
+            await client.get(f"/mcp/files/{handle}", headers=headers)
+        ).content == b"attachment"
