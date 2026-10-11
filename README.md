@@ -42,6 +42,9 @@ redirects require configured HTTPS origins. Alternative authentication remains p
 No live Zulip or production operation has been verified; protocol tests use
 disposable local HTTP and ASGI fixtures.
 
+Set `ZULIPCHAT_READ_ONLY=true` to enforce read-only Zulip access across tools
+and batches. See [access policies and audit limitations](docs/access-policies.md).
+
 ## Identity provisioning
 
 Local administrator commands now manage encrypted identities, expiring manual

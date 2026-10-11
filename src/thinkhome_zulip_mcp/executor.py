@@ -3,6 +3,7 @@
 import asyncio
 import json
 import math
+import os
 from collections.abc import Awaitable, Callable
 from contextlib import ExitStack
 from copy import deepcopy
@@ -140,7 +141,14 @@ class Executor:
         max_response_bytes: int = 8 * 1024 * 1024,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         files: FileStore | None = None,
+        read_only: bool | None = None,
     ) -> None:
+        if read_only is None:
+            setting = os.environ.get("ZULIPCHAT_READ_ONLY", "false").lower()
+            if setting not in {"true", "false", "1", "0"}:
+                raise ValueError("ZULIPCHAT_READ_ONLY must be true, false, 1 or 0")
+            read_only = setting in {"true", "1"}
+        self.read_only = read_only
         if max_response_bytes <= 0:
             raise ValueError("Response limit must be positive")
         self.document = load_document()
@@ -281,6 +289,18 @@ class Executor:
         operation = self.catalog.get(operation_id)
         if operation is None:
             return OperationResult(request_id, error={"code": "unknown_operation"})
+        if self.read_only and (
+            operation.method not in {"GET", "HEAD", "OPTIONS"}
+            or operation.definition.get("x-thinkhome", {}).get("safe_read") is False
+            or operation_id
+            in {
+                "get-events",
+                "get-stream-email-address",
+                "create-big-blue-button-video-call",
+                "summarize-messages",
+            }
+        ):
+            return OperationResult(request_id, error={"code": "read_only_policy"})
         if operation.path.startswith(("/dev_", "/remotes/")) or operation_id in {
             "fetch-api-key",
             "jwt-fetch-api-key",

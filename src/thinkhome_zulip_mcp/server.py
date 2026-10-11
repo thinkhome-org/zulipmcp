@@ -530,6 +530,7 @@ def create_server(
             "transport": "http" if authenticator else "stdio",
             "permissions": "unknown; enforced by Zulip",
             "full_coverage": False,
+            "read_only": executor.read_only,
             "catalog_operations": len(executor.catalog),
             "max_response_bytes": executor.max_response_bytes,
             "message_max_length": message_max_length,
@@ -563,6 +564,21 @@ def create_server(
                 "Per-operation wire and live integration coverage incomplete",
             ],
         }
+
+    if executor.read_only:
+        for name in (
+            "zulip_send_message",
+            "zulip_send_direct_message",
+            "zulip_edit_message",
+            "zulip_add_reaction",
+            "zulip_remove_reaction",
+            "zulip_move_messages",
+            "zulip_resolve_topic",
+            "zulip_register_events",
+            "zulip_poll_events",
+            "zulip_delete_events",
+        ):
+            server.remove_tool(name)
 
     return server
 
