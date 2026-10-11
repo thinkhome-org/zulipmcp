@@ -45,6 +45,9 @@ disposable local HTTP and ASGI fixtures.
 Set `ZULIPCHAT_READ_ONLY=true` to enforce read-only Zulip access across tools
 and batches. See [access policies and audit limitations](docs/access-policies.md).
 
+[User tools](docs/user-discovery.md) support profile lookup, named custom fields,
+name/email matching, presence, status, groups and caller-specific mute preferences.
+
 ## Identity provisioning
 
 Local administrator commands now manage encrypted identities, expiring manual

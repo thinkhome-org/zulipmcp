@@ -11,6 +11,9 @@ CALLER = Principal("alice", "https://zulip.example", "alice", "synthetic")
     "operation",
     [
         "send-message",
+        "update-status",
+        "mute-user",
+        "unmute-user",
         "update-message",
         "register-queue",
         "get-events",
@@ -66,6 +69,15 @@ async def test_read_only_discovery_and_batch_cannot_bypass_policy():
         "zulip_batch",
         "zulip_history",
         "zulip_get_message",
+        "zulip_get_users",
+        "zulip_get_user",
+        "zulip_get_own_user",
+        "zulip_resolve_user",
+        "zulip_get_presence",
+        "zulip_get_user_status",
+        "zulip_get_user_groups",
+        "zulip_get_user_group_members",
+        "zulip_is_user_group_member",
         "zulip_capabilities",
     }
     result = await server.call_tool(

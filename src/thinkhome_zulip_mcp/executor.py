@@ -282,6 +282,10 @@ class Executor:
                     )
                     for key, value in values.items()
                 }
+        if operation.method == "GET":
+            # Zulip reads GET arguments from the query, even with form-body schemas.
+            query.update(form)
+            form = {}
         authenticated = (
             definition.get("security", self.document.get("security", [])) != []
         )
@@ -310,7 +314,22 @@ class Executor:
     async def execute(
         self, principal: Principal, operation_id: str, arguments: dict[str, Any]
     ) -> OperationResult:
-        if not self.channel_policy.active:
+        if not self.channel_policy.active or operation_id in {
+            "get-users",
+            "get-user",
+            "get-user-by-email",
+            "get-own-user",
+            "get-custom-profile-fields",
+            "get-presence",
+            "get-user-presence",
+            "get-user-status",
+            "get-user-groups",
+            "get-user-group-members",
+            "get-is-user-group-member",
+            "update-status",
+            "mute-user",
+            "unmute-user",
+        }:
             return await self._execute(principal, operation_id, arguments)
         if operation_id == "delete-queue":
             result = await self._execute(principal, operation_id, arguments)

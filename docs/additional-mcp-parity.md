@@ -12,7 +12,8 @@ Observed on 2026-10-11 by reading pinned source, without importing or executing 
 
 ## Additional tool-name inventory
 
-All rows are **pending high-level implementation/verification**. Existing generic API primitives and event/file foundations are not counted as complete reference workflows. Source links identify the first static registration; repeated registrations are deduplicated by name.
+The source-name rows are a reference inventory, not completion claims. Partial
+implementation evidence is recorded below; full parity remains pending. Existing generic API primitives and event/file foundations are not counted as complete reference workflows. Source links identify the first static registration; repeated registrations are deduplicated by name.
 
 | Tool / compatibility name | unfoldingWord source | akougkas source |
 |---|---|---|
@@ -91,6 +92,17 @@ All rows are **pending high-level implementation/verification**. Existing generi
 | `upload_file` | [registration](https://github.com/unfoldingWord/uw-zulip-mcp/blob/56c51bdaaa5de80dd364c42a60fd3def559eccc7/src/zulipchat_mcp/tools/files.py#L476) | [registration](https://github.com/akougkas/zulipchat-mcp/blob/31d4611e544c5cea3da4706131db3306eceb9e31/src/zulipchat_mcp/tools/files.py#L570) |
 | `wait_for_response` | [registration](https://github.com/unfoldingWord/uw-zulip-mcp/blob/56c51bdaaa5de80dd364c42a60fd3def559eccc7/src/zulipchat_mcp/tools/__init__.py#L205) | [registration](https://github.com/akougkas/zulipchat-mcp/blob/31d4611e544c5cea3da4706131db3306eceb9e31/src/zulipchat_mcp/tools/__init__.py#L186) |
 
+## User discovery implementation
+
+[Eleven caller-bound tools](user-discovery.md) now implement user listing, ID/email
+lookup, own profile, named profile fields, and substring/fuzzy candidates with
+explicit ambiguity, presence/status, group membership and caller-specific mute
+preferences. This overlaps `get_users`, `get_user`, `get_user_by_id`,
+`get_user_by_email`, `get_own_user`, `resolve_user`, presence/status/group reads,
+`update_status`, and mute/unmute operations; it does not claim full
+reference cache/config or all user-management parity. Unit, wire, stdio and
+authenticated HTTP isolation/revocation tests cover the implemented behavior.
+
 ## Functional requirements beyond tool names
 
 | Area | Required capability | Evidence / status |
@@ -99,7 +111,7 @@ All rows are **pending high-level implementation/verification**. Existing generi
 | Bot mention inbox | Persistent event-fed inbox for ordinary mentions and follow-ups, host-adapter poll/ack behavior, source-topic replies without slash-reply requirement | akougkas `services/bot_mentions.py`; pending |
 | Approvals and hooks | Owner-bound `/approve REQUEST_ID` / `/deny REQUEST_ID`, explicit request correlation, Claude hooks and permission bridge, no treating arbitrary message text as authorization | Core protocol/control and `claude_hooks.py`; pending |
 | Scheduling and drafts | Schedule create/update/delete/list, durable scheduler lifecycle, drafts CRUD, file operations and cross-post partial results | Schedule/draft tools and scheduler service; generic primitives only |
-| Search/discovery | Advanced and full-text search, narrow construction/checking, fuzzy user resolution with ambiguity handling, presence/status/groups/members, topic/stream info | Tool modules; wrappers and behavior tests pending |
+| Search/discovery | Advanced and full-text search, narrow construction/checking, fuzzy user resolution with ambiguity handling, presence/status/groups/members, topic/stream info | User lookup/resolution implemented with [documented tests and limits](user-discovery.md); presence/status/groups and mute tools also implemented; advanced search and remaining wrappers pending |
 | Analytics | Daily summaries, stream/team analysis, report generation, optional server-side Anthropic provider/model and structured-data fallback when unavailable | `tools/ai_analytics.py`; pending, no provider execution claimed |
 | Policies | Core/extended discovery, enforced read-only profile, agent disabling, explicit administrative mode, truthful error/task annotations | Server/registrars/tool-contract; [read-only executor and discovery](access-policies.md) implemented with unit and authenticated HTTP tests; other profiles and complete endpoint side-effect audit pending |
 | Channel policy | Johnny Decimal area allow/deny, named include/exclude, deny precedence, non-JD/DM/private exclusion, unknown-ID fail-closed behavior, blocked counters | UW `core/channel_filter.py` and README; [rule engine and 18 guarded operations (event queues currently message-only)](access-policies.md) implemented; remaining endpoint guards, unknown-ID configuration, counters and end-to-end parity pending |

@@ -4,7 +4,7 @@ import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -32,6 +32,7 @@ from thinkhome_zulip_mcp.file_http import file_routes
 from thinkhome_zulip_mcp.files import FileStore
 from thinkhome_zulip_mcp.markdown import prepare_message
 from thinkhome_zulip_mcp.store import AuthenticationError
+from thinkhome_zulip_mcp.users import resolve_users
 from thinkhome_zulip_mcp.workflows import execute_batch, history_page
 
 
@@ -301,6 +302,248 @@ def create_server(
             "History page received; inspect exhausted and history_limited.",
         )
 
+    user_read = ToolAnnotations(
+        read_only_hint=True, destructive_hint=False, open_world_hint=True
+    )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_users(
+        user_ids: list[Annotated[int, Field(ge=1)]] | None = None,
+        include_custom_profile_fields: bool = False,
+        client_gravatar: bool = False,
+    ) -> CallToolResult:
+        """List caller-visible users, optionally restricted to explicit user IDs."""
+        arguments: dict[str, Any] = {
+            "include_custom_profile_fields": include_custom_profile_fields,
+            "client_gravatar": client_gravatar,
+        }
+        if user_ids is not None:
+            arguments["user_ids"] = user_ids
+        return _tool_result(
+            await executor.execute(current_principal(), "get-users", arguments),
+            "Users received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_own_user() -> CallToolResult:
+        """Fetch the authenticated caller's Zulip profile."""
+        return _tool_result(
+            await executor.execute(current_principal(), "get-own-user", {}),
+            "Caller profile received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_user(
+        user_id: Annotated[int, Field(ge=1)] | None = None,
+        email: Annotated[str, Field(min_length=1, max_length=320)] | None = None,
+        include_custom_profile_fields: bool = False,
+        client_gravatar: bool = False,
+    ) -> CallToolResult:
+        """Fetch a user by ID or visible email, with optional named profile fields."""
+        if (user_id is None) == (email is None):
+            raise ToolError("Provide exactly one of user_id or email")
+        arguments: dict[str, Any] = {
+            "include_custom_profile_fields": include_custom_profile_fields,
+            "client_gravatar": client_gravatar,
+        }
+        arguments.update(
+            {"user_id": user_id} if user_id is not None else {"email": email}
+        )
+        result = await executor.execute(
+            current_principal(),
+            "get-user" if user_id is not None else "get-user-by-email",
+            arguments,
+        )
+        if not result.error and include_custom_profile_fields:
+            fields = await executor.execute(
+                current_principal(), "get-custom-profile-fields", {}
+            )
+            definitions = (
+                fields.data.get("custom_fields")
+                if isinstance(fields.data, dict)
+                else None
+            )
+            if fields.error or not isinstance(definitions, list):
+                result = replace(result, error={"code": "profile_fields_unavailable"})
+            elif not isinstance(result.data, dict):
+                result = replace(
+                    result, data=None, error={"code": "invalid_user_response"}
+                )
+            else:
+                result = replace(
+                    result, data={**result.data, "custom_fields": definitions}
+                )
+        return _tool_result(result, "User profile received.")
+
+    @server.tool(annotations=user_read)
+    async def zulip_resolve_user(
+        query: Annotated[str, Field(min_length=1, max_length=256)],
+        mode: Literal["fuzzy", "substring"] = "fuzzy",
+        threshold: Annotated[float, Field(ge=0, le=1)] = 0.6,
+        limit: Annotated[int, Field(ge=1, le=100)] = 20,
+        include_bots: bool = False,
+        include_inactive: bool = False,
+    ) -> CallToolResult:
+        """Find users by name/email; do not auto-select ambiguous recipients."""
+        if not query.strip():
+            raise ToolError("Query must not be blank")
+        result = await executor.execute(current_principal(), "get-users", {})
+        if not result.error:
+            try:
+                matched = resolve_users(
+                    result.data.get("members")
+                    if isinstance(result.data, dict)
+                    else None,
+                    query,
+                    mode=mode,
+                    threshold=threshold,
+                    limit=limit,
+                    include_bots=include_bots,
+                    include_inactive=include_inactive,
+                )
+                result = replace(result, data=matched)
+            except ValueError:
+                result = replace(
+                    result, data=None, error={"code": "invalid_user_response"}
+                )
+        return _tool_result(
+            result, "User candidates received; inspect status and total."
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_presence(
+        user_id_or_email: Annotated[int, Field(ge=1)]
+        | Annotated[str, Field(min_length=1, max_length=320)]
+        | None = None,
+    ) -> CallToolResult:
+        """Get presence for one user by ID/email, or for the organization."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-user-presence" if user_id_or_email is not None else "get-presence",
+                {"user_id_or_email": str(user_id_or_email)}
+                if user_id_or_email is not None
+                else {},
+            ),
+            "Presence received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_user_status(
+        user_id: Annotated[int, Field(ge=1)],
+    ) -> CallToolResult:
+        """Read an accessible user's status text and emoji."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(), "get-user-status", {"user_id": user_id}
+            ),
+            "User status received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_user_groups(
+        include_deactivated_groups: bool = False,
+    ) -> CallToolResult:
+        """List user groups, optionally including deactivated groups."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-user-groups",
+                {"include_deactivated_groups": include_deactivated_groups},
+            ),
+            "User groups received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_get_user_group_members(
+        user_group_id: Annotated[int, Field(ge=1)],
+        direct_member_only: bool = False,
+    ) -> CallToolResult:
+        """Read group members, optionally excluding subgroup members."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-user-group-members",
+                {
+                    "user_group_id": user_group_id,
+                    "direct_member_only": direct_member_only,
+                },
+            ),
+            "Group members received.",
+        )
+
+    @server.tool(annotations=user_read)
+    async def zulip_is_user_group_member(
+        user_group_id: Annotated[int, Field(ge=1)],
+        user_id: Annotated[int, Field(ge=1)],
+        direct_member_only: bool = False,
+    ) -> CallToolResult:
+        """Check a user's direct or transitive group membership."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-is-user-group-member",
+                {
+                    "user_group_id": user_group_id,
+                    "user_id": user_id,
+                    "direct_member_only": direct_member_only,
+                },
+            ),
+            "Group membership checked.",
+        )
+
+    user_write = ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=True,
+    )
+
+    @server.tool(annotations=user_write)
+    async def zulip_update_status(
+        status_text: Annotated[str, Field(max_length=60)] | None = None,
+        emoji_name: str | None = None,
+        emoji_code: str | None = None,
+        reaction_type: Literal[
+            "unicode_emoji", "realm_emoji", "zulip_extra_emoji"
+        ] = "unicode_emoji",
+        away: bool | None = None,
+    ) -> CallToolResult:
+        """Change caller status: empty text/emoji clears, None leaves unchanged."""
+        arguments = {
+            key: value
+            for key, value in {
+                "status_text": status_text,
+                "emoji_name": emoji_name,
+                "emoji_code": emoji_code,
+                "away": away,
+            }.items()
+            if value is not None
+        }
+        if not arguments:
+            raise ToolError("Provide status_text, emoji_name, emoji_code or away")
+        if emoji_name is not None or emoji_code is not None:
+            arguments["reaction_type"] = reaction_type
+        return _tool_result(
+            await executor.execute(current_principal(), "update-status", arguments),
+            "Caller status updated.",
+        )
+
+    @server.tool(annotations=user_write)
+    async def zulip_manage_user_mute(
+        muted_user_id: Annotated[int, Field(ge=1)],
+        action: Literal["mute", "unmute"] = "mute",
+    ) -> CallToolResult:
+        """Mute/unmute another user for the authenticated caller's notifications."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "mute-user" if action == "mute" else "unmute-user",
+                {"muted_user_id": muted_user_id},
+            ),
+            "Caller mute preference updated.",
+        )
+
     queue_annotations = ToolAnnotations(
         read_only_hint=False, destructive_hint=False, open_world_hint=True
     )
@@ -567,6 +810,8 @@ def create_server(
 
     if executor.read_only:
         for name in (
+            "zulip_update_status",
+            "zulip_manage_user_mute",
             "zulip_send_message",
             "zulip_send_direct_message",
             "zulip_edit_message",

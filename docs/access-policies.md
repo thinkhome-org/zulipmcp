@@ -76,6 +76,12 @@ The windborne compatibility profile's default-private-denial remains pending.
 | `update-message`, `delete-message`, `add-reaction`, `remove-reaction` | Validate input, check source-message access and source-channel write rules; moves also check the destination. Read-only denials precede metadata requests. |
 | `get-stream-topics`, `get-subscribers`, `get-subscription-status` | Check channel metadata before fetching the requested data. |
 
+Fourteen [user/profile/presence/group and own-preference operations](user-discovery.md)
+are separately audited as independent of channel content and remain available.
+Status and mute writes are still denied by read-only mode. They retain upstream profile and email
+visibility checks; free-form profile text and message-existence metadata are not
+redacted.
+
 While a channel policy is active, all other operations return
 `channel_policy_not_supported` without making an upstream call. This temporary
 restriction prevents unguarded generic endpoints from bypassing the rules;
