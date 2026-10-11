@@ -213,3 +213,62 @@ async def test_reaction_tools_encode_custom_emoji(tool, method):
         },
     )
     assert not result.is_error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "autofix, expected",
+    [
+        ("1", "**[title](https://example.com)**"),
+        ("0", "[**title**](https://example.com)"),
+    ],
+)
+async def test_outgoing_message_normalization_can_be_disabled(
+    monkeypatch, autofix, expected
+):
+    monkeypatch.setenv("ZULIPMCP_MARKDOWN_AUTOFIX", autofix)
+
+    def upstream(request):
+        assert parse_qs(request.content.decode())["content"] == [expected]
+        return httpx.Response(200, json={"result": "success"})
+
+    server = create_server(
+        Principal("alice", "https://zulip.example", "alice", "synthetic"),
+        Executor(transport=httpx.MockTransport(upstream)),
+    )
+    result = await server.call_tool(
+        "zulip_edit_message",
+        {"message_id": 5, "content": "[**title**](https://example.com)"},
+    )
+    assert not result.is_error
+
+
+@pytest.mark.asyncio
+async def test_configured_message_limit_blocks_before_network(monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    monkeypatch.setenv("ZULIP_MAX_MESSAGE_LENGTH", "3")
+    seen = []
+
+    def upstream(request):
+        seen.append(request)
+        return httpx.Response(200, json={"result": "success"})
+
+    server = create_server(
+        Principal("alice", "https://zulip.example", "alice", "synthetic"),
+        Executor(transport=httpx.MockTransport(upstream)),
+    )
+    with pytest.raises(ToolError, match="limit"):
+        await server.call_tool(
+            "zulip_edit_message", {"message_id": 5, "content": "long"}
+        )
+    assert seen == []
+    caps = await server.call_tool("zulip_capabilities", {})
+    assert caps.structured_content["message_max_length"] == 3
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "invalid"])
+def test_invalid_message_limit_rejects_startup(monkeypatch, value):
+    monkeypatch.setenv("ZULIP_MAX_MESSAGE_LENGTH", value)
+    with pytest.raises(ValueError):
+        create_server(Principal("alice", "https://zulip.example", "alice", "synthetic"))

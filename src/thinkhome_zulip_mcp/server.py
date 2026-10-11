@@ -14,6 +14,7 @@ from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.routes import build_resource_metadata_url, cors_middleware
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import AnyHttpUrl, Field
@@ -29,6 +30,7 @@ from thinkhome_zulip_mcp.events import EventQueues
 from thinkhome_zulip_mcp.executor import Executor, OperationResult, Principal
 from thinkhome_zulip_mcp.file_http import file_routes
 from thinkhome_zulip_mcp.files import FileStore
+from thinkhome_zulip_mcp.markdown import prepare_message
 from thinkhome_zulip_mcp.store import AuthenticationError
 from thinkhome_zulip_mcp.workflows import execute_batch, history_page
 
@@ -97,6 +99,16 @@ def create_server(
             }
         )
     executor = executor or Executor()
+    message_max_length = int(os.environ.get("ZULIP_MAX_MESSAGE_LENGTH", "10000"))
+    if message_max_length < 1:
+        raise ValueError("ZULIP_MAX_MESSAGE_LENGTH must be positive")
+
+    def outgoing_content(content: str) -> str:
+        try:
+            return prepare_message(content, max_length=message_max_length)
+        except ValueError as exc:
+            raise ToolError(str(exc)) from exc
+
     queues = EventQueues(executor)
 
     @asynccontextmanager
@@ -334,7 +346,7 @@ def create_server(
                     "type": "stream",
                     "to": stream,
                     "topic": topic,
-                    "content": content,
+                    "content": outgoing_content(content),
                 },
             ),
             "Message sent.",
@@ -353,7 +365,7 @@ def create_server(
                 {
                     "type": "direct",
                     "to": recipients,
-                    "content": content,
+                    "content": outgoing_content(content),
                 },
             ),
             "Direct message sent.",
@@ -371,7 +383,7 @@ def create_server(
                 "update-message",
                 {
                     "message_id": message_id,
-                    "content": content,
+                    "content": outgoing_content(content),
                 },
             ),
             "Message updated.",
@@ -520,6 +532,7 @@ def create_server(
             "full_coverage": False,
             "catalog_operations": len(executor.catalog),
             "max_response_bytes": executor.max_response_bytes,
+            "message_max_length": message_max_length,
             "event_queues": {
                 "max_queues": queues.max_queues,
                 "max_wait_seconds": 25,

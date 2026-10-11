@@ -69,8 +69,9 @@ See [CONTRIBUTING](CONTRIBUTING.md), the
 [design](docs/superpowers/specs/2026-10-11-thinkhome-zulip-mcp-design.md), and the
 [implementation plan](docs/superpowers/plans/2026-10-11-thinkhome-zulip-mcp.md).
 
-Project code is licensed under [MIT](LICENSE). Bundled Zulip material retains its
-[Apache-2.0 license](src/thinkhome_zulip_mcp/data/ZULIP-LICENSE).
+Original project code is licensed under [MIT](LICENSE). Bundled Zulip material
+and adapted windborne Markdown helpers retain Apache-2.0; see
+[third-party notices](src/thinkhome_zulip_mcp/data/THIRD-PARTY-NOTICES.md).
 Publication targets remain pending; no release is published.
 
 ## Required reference parity

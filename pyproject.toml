@@ -7,8 +7,8 @@ name = "thinkhome-zulip-mcp"
 version = "0.1.0.dev0"
 description = "Auditable Zulip application API access through MCP"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND Apache-2.0"
+license-files = ["LICENSE", "src/thinkhome_zulip_mcp/data/*LICENSE", "src/thinkhome_zulip_mcp/data/*NOTICE", "src/thinkhome_zulip_mcp/data/THIRD-PARTY-NOTICES.md"]
 requires-python = ">=3.12"
 dependencies = [
     "cryptography>=50.0.2",
