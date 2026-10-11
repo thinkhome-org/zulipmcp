@@ -1,0 +1,79 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.12.9'
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src scripts
+      - run: uv run pytest
+      - run: uv run python scripts/catalog.py check
+      - name: Build without local runtime artifacts
+        run: |
+          mkdir -p .superpowers/packaging-check
+          echo synthetic-local-marker > .superpowers/packaging-check/credential-marker
+          uv build
+          uv run python - <<'PY'
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          forbidden = {'.venv', '.superpowers', '__pycache__', '.git', 'dist'}
+          with tarfile.open(next(Path('dist').glob('*.tar.gz'))) as archive:
+              assert all(item.isfile() or item.isdir() for item in archive.getmembers())
+              source_names = archive.getnames()
+          with zipfile.ZipFile(next(Path('dist').glob('*.whl'))) as archive:
+              wheel_names = archive.namelist()
+          for names in (source_names, wheel_names):
+              assert all(not forbidden.intersection(Path(name).parts) for name in names)
+              assert any(name.endswith('data/provenance.json') for name in names)
+              assert any(name.endswith('data/zulip.yaml') for name in names)
+              assert any(name.endswith('LICENSE') for name in names)
+          PY
+      - name: Installed wheel smoke
+        run: |
+          uv venv /tmp/mcp-wheel
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+            --output-file /tmp/mcp-runtime.txt > /dev/null
+          uv pip install --python /tmp/mcp-wheel/bin/python --require-hashes -r /tmp/mcp-runtime.txt
+          uv pip install --python /tmp/mcp-wheel/bin/python dist/*.whl
+          uv export --frozen --only-group dev --no-emit-project --format requirements-txt \
+            --output-file /tmp/mcp-tests.txt > /dev/null
+          uv pip install --python /tmp/mcp-wheel/bin/python --require-hashes -r /tmp/mcp-tests.txt
+          mkdir /tmp/mcp-wheel-smoke
+          cp tests/integration/test_stdio.py tests/integration/test_http_auth.py /tmp/mcp-wheel-smoke/
+          cd /tmp
+          /tmp/mcp-wheel/bin/thinkhome-zulip-mcp --version
+          /tmp/mcp-wheel/bin/python -c 'import thinkhome_zulip_mcp; assert "/tmp/mcp-wheel/" in thinkhome_zulip_mcp.__file__'
+          /tmp/mcp-wheel/bin/python -m pytest -q /tmp/mcp-wheel-smoke
+  ci-gate:
+    if: always()
+    needs: [checks]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require successful checks
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: test "$RESULT" = success

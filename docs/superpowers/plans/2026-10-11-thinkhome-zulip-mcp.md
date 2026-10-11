@@ -63,11 +63,13 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 
 **Rozhraní:** CLI `thinkhome-zulip-mcp --version`, `serve --transport stdio|http`, později `identity` a `token` podřízené příkazy. Import balíčku nesmí provádět síťová volání.
 
-- [ ] Založit repo workflow podle bootstrap pravidla, zdokumentovat vývojové prostředí a tajné údaje mimo Git.
-- [ ] Napsat test `test_cli_version` a `test_import_has_no_network_access`; spustit a zaznamenat očekávaný neúspěch před implementací.
-- [ ] Přidat minimální balíček a CI s Ruff, mypy, pytest a sestavením wheel/sdist.
-- [ ] Ověřit `uv sync --frozen`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`, `uv run pytest tests/unit`, `uv build`.
-- [ ] Aktualizovat README/CONTRIBUTING a commit `ci: bootstrap package and contribution checks`; push a PR.
+- [x] Založit repo workflow podle bootstrap pravidla, zdokumentovat vývojové prostředí a tajné údaje mimo Git.
+- [x] Napsat test `test_cli_version` a `test_import_has_no_network_access`; spustit a zaznamenat očekávaný neúspěch před implementací.
+- [x] Přidat minimální balíček a CI s Ruff, mypy, pytest a sestavením wheel/sdist.
+- [x] Ověřit `uv sync --frozen`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`, `uv run pytest tests/unit`, `uv build`.
+- [x] Aktualizovat README/CONTRIBUTING a commit `ci: bootstrap package and contribution checks`; push a PR.
+
+**Evidence:** commits `ead2e0a`/`75f0539`, draft PR #2, CI run `38106022812` passed Python 3.12/3.14. Review/merge pending. `serve` is deferred to real transport implementation in tasks 3–4, not a no-op command.
 
 ## Úloha 2 — Úplný inventář veřejného a nedokumentovaného API
 
@@ -90,8 +92,8 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 
 - [ ] Napsat testy `test_wire_encoding_for_each_operation`, `test_unknown_arguments_are_rejected`, `test_read_retries_respect_retry_after`, `test_write_timeout_is_not_retried`, `test_redirect_does_not_leak_credentials`.
 - [ ] Implementovat správné path/query/form/JSON serializace a upstream chyby bez ztráty detailu potřebného klientovi; validovat cílový origin a velikost odpovědi.
-- [ ] Přidat katalogové nástroje a MCP anotace pro čtení/zápis/destruktivitu; anotace nejsou autorizační kontrola.
-- [ ] Přidat procesový test skutečného stdio initialize/list/call; stdout pouze MCP, logy na stderr bez secretů.
+- [x] Přidat katalogové nástroje a MCP anotace pro čtení/zápis/destruktivitu; anotace nejsou autorizační kontrola.
+- [x] Přidat procesový test skutečného stdio initialize/list/call; stdout pouze MCP, logy na stderr bez secretů.
 - [ ] Ověřit unit/contract testy a CLI start; zdokumentovat konfiguraci a příklady. Commit `feat: execute catalog operations over stdio`; push a PR.
 
 ## Úloha 4 — Více uživatelů, tokeny a HTTP autorizace
@@ -101,12 +103,19 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 **Rozhraní:** `authenticate(bearer: str) -> Principal`; CLI `identity add|update|remove`, `token issue|revoke`, `secrets rotate`. Každý autentizovaný request si načte platnou identitu; session ID samo neopravňuje k přístupu.
 
 - [ ] Napsat `test_two_users_never_share_credentials`, `test_revoked_token_is_rejected`, `test_wrong_issuer_audience_expiry_is_rejected`, `test_unknown_oauth_subject_has_no_zulip_access`, `test_secret_rotation_preserves_access`.
-- [ ] Implementovat SQLite s verzovanou migrací, šifrovanými Zulip secrets a hashovanými MCP tokeny. Šifrovací klíč je mimo DB; záloha a obnova DB+klíče se dokumentuje bez ukládání klíče do Git.
-- [ ] Přidat oddělené ruční tokeny a OAuth resource server přes ověřenou knihovnu/SDK; discovery a WWW-Authenticate podle připnuté podporované MCP specifikace.
-- [ ] Připravit konfiguraci externího Keycloak testovacího realm a protokolové testy validních/nevalidních access tokenů; žádný vlastní frontend a žádné spuštění prohlížeče.
+- [x] Implementovat SQLite s verzovanou migrací, šifrovanými Zulip secrets a hashovanými MCP tokeny. Šifrovací klíč je mimo DB; záloha a obnova DB+klíče se dokumentuje bez ukládání klíče do Git.
+- [x] Přidat oddělené ruční tokeny a OAuth resource server přes ověřenou knihovnu/SDK; discovery a WWW-Authenticate podle připnuté podporované MCP specifikace.
+- [x] Připravit konfiguraci externího Keycloak testovacího realm a protokolové testy validních/nevalidních access tokenů; žádný vlastní frontend a žádné spuštění prohlížeče.
 - [ ] Přidat adapter pro jinou autentizaci jen tam, kde ji doložil audit, včetně CSRF, expirace a shody identity u session credentials.
-- [ ] Ověřit souběžné HTTP klienty, ukončení session a odvolání tokenu během provozu. Popsat provisioning, rotaci a rozdíly identity/role.
+- [x] Ověřit souběžné HTTP klienty, ukončení session a odvolání tokenu během provozu. Popsat provisioning, rotaci a rozdíly identity/role.
 - [ ] Commit `feat: isolate users and authorize HTTP clients`; push a PR.
+
+**Partial evidence:** SQLite schema v1, Fernet-encrypted identities, expiring hashed
+manual tokens, exact OAuth mappings, offline atomic key rotation and provisioning
+CLI are implemented. HTTP request authentication, signed JWT validation and
+resource discovery have synthetic protocol tests. A real Keycloak 26.8 fixture
+now covers PKCE and two official SDK network clients. Alternate upstream auth and
+actual Zulip integration remain pending; Task 4 is not complete.
 
 ## Úloha 5 — Binární operace a zbývající aplikační endpointy
 
@@ -121,6 +130,14 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 - [ ] Ověřit kontrakt suite a znovu coverage kontrolu; nevydávat generickou HTTP funkci za otestované pokrytí všech operací.
 - [ ] Commit(y) podle ucelených oblastí, push a PR s aktualizací matice pokrytí.
 
+**Partial evidence:** internal FileStore and multipart executor cover owner binding,
+15-minute handle expiry, bounded streaming, local path/symlink checks and seven
+multipart schemas. Authenticated HTTP staging/retrieval/deletion, stdio local
+import and lifecycle cleanup are implemented. Signed-URL attachment downloads
+are implemented with caller authorization and bounded credential-free transfers.
+Live Zulip/storage verification and the remaining API audit are pending; Task 5
+is not complete.
+
 ## Úloha 6 — Události a praktické pracovní nástroje
 
 **PR:** `codex/events-workflows`; `events.py`, `workflows.py`, odpovídající testy a příklady.
@@ -132,6 +149,43 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 - [ ] Přidat pohodlné nástroje pro fulltext, historii, zprávy, přesun/resolve tématu a soubory bez duplikace autorizace a validace.
 - [ ] Přidat batch s explicitními dílčími výsledky, žádný rollback nebo neověřená idempotence. Změny více uživatelů používají jen upstream dostupné operace a oprávnění volajícího.
 - [ ] Ověřit testy a ukázkové scénáře proti testovacímu Zulipu; commit `feat: add event handling and bounded workflows`; push a PR.
+
+**Partial evidence:** caller-owned managed queues expose registration, explicit
+cursor acknowledgements, 25-second polling, expiration/resync reporting,
+cancellation and bounded shutdown. Unit/SDK/HTTP fixture tests cover identity
+isolation and wire encoding. Reference listen/session behavior, workflows and live
+Zulip integration remain pending; Task 6 is not complete.
+
+**Additional partial evidence:** `zulip_batch` runs up to 50 catalog operations,
+refreshes caller access for each, stops on error and reports partial results.
+`zulip_history` reads one page up to 200 messages using exclusive ID cursors.
+Unit, executor-wire, stdio and authenticated HTTP fixtures cover pagination,
+identity selection and token revocation during a batch. Live Zulip workflow
+acceptance and the remaining convenience tools are still pending.
+
+Message tool progress: dedicated read/send/DM/edit/reaction/move/resolve tools
+use the shared executor. Move and resolve have explicit notification/propagation
+behavior and channel lookup validation. Wire tests cover the basic operations;
+reference normalization, configurable channel policies and full workflow parity
+remain incomplete.
+
+## Úloha 6A — Povinná úplná parita tří MCP referencí kromě Hermes
+
+**Doplněný požadavek uživatele:** výsledný projekt musí mít nejméně všechny funkce
+referenčního projektu, nejen stejné REST endpointy. Závazný inventář a připnuté SHA
+jsou v [zulipmcp-parity.md](../../zulipmcp-parity.md) a
+[additional-mcp-parity.md](../../additional-mcp-parity.md): windborne/zulipmcp,
+unfoldingWord/uw-zulip-mcp a akougkas/zulipchat-mcp. Hermes je jediná výjimka;
+kompletní aplikační API je další současný požadavek.
+
+- [ ] Doplnit všech 27 MCP nástrojů a jejich chování včetně context/reply/listen/end_session, formátování, viditelnosti, allowlistů, normalizace a souborových wrapperů.
+- [ ] Dodat caller-scoped Python knihovnu pokrývající všechny veřejné schopnosti referenční knihovny, konfiguraci a hooky.
+- [ ] Dodat autentizovaný legacy SSE transport vedle stdio a Streamable HTTP.
+- [ ] Dodat explicitní direct-launch CLI pro Claude/Codex a mention listener pro Claude/Codex/OpenCode, překlady MCP konfigurace, životní cyklus a všechny doložené volby.
+- [ ] Zachovat omezené jednotlivé event polly (25 s), přidat obnovitelné dlouhé čekání s keepalive/cancel pro referenční listen workflow; žádné sdílení stavů mezi identitami.
+- [ ] Dodat sjednocení nástrojů a chování dalších dvou referencí: agentní approval/inbox/task workflows, plánování/koncepty, analytiku a fallback, policies/filtry, hosted enrollment/secret provider, povolené identity, skills/resources a export klientských balíčků.
+- [ ] Pro každý řádek inventáře doložit implementaci a regresní/integrační test; ověřit také scénáře z upstream testů. Zvlášť označit skutečné provider testy versus testy příkazů.
+- [ ] Aktualizovat dokumentaci, kompatibilitu, provenance/notice při případném převzetí kódu, push a draft PR po ucelených částech.
 
 ## Úloha 7 — Integrační kompatibilita a bezpečnostní review
 
@@ -171,6 +225,7 @@ Při nedostupnosti required checku se PR nemerguje s tvrzením, že je ověřen�
 
 ## Podmínky pro v1.0
 
+- [ ] Úplná funkční parita se všemi třemi připnutými MCP referencemi kromě Hermes podle `docs/zulipmcp-parity.md` a `docs/additional-mcp-parity.md`, doložená po jednotlivých funkcích.
 - [ ] Kompletní audit produkčních aplikačních rout a parametrů cílového Zulipu, veřejných i nedokumentovaných, bez nevysvětlených mezer.
 - [ ] Všechny in-scope operace implementované; 100 % položek má serializační/kontrakt test. Coverage není jen řádkové procento Pythonu.
 - [ ] Integračně ověřené autentizační a transportní cesty, izolace identit, hlavní CRUD/lifecycle a všechny vlastní nedokumentované adaptéry.

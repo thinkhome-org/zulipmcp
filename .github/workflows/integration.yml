@@ -1,0 +1,56 @@
+name: Integration
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  oauth-provider:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.12.9'
+          python-version: '3.12'
+      - run: uv sync --frozen
+      - name: Install checksum-pinned isolated provider runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/mcp-oauth-runtime"
+          mkdir -p "$runtime/java" "$runtime/keycloak"
+          curl --fail --location --silent --show-error --max-time 300 \
+            https://corretto.aws/downloads/resources/25.0.4.10.1/amazon-corretto-25.0.4.10.1-linux-x64.tar.gz \
+            --output "$runtime/java.tar.gz"
+          echo "a45f1d385da8221fe1225dde5b6afa8e932a6acb93571b55eff4a39a2ebe7378  $runtime/java.tar.gz" | sha256sum --check -
+          curl --fail --location --silent --show-error --max-time 300 \
+            https://github.com/keycloak/keycloak/releases/download/26.8.0/keycloak-26.8.0.tar.gz \
+            --output "$runtime/keycloak.tar.gz"
+          echo "9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a  $runtime/keycloak.tar.gz" | sha256sum --check -
+          tar -xzf "$runtime/java.tar.gz" --strip-components=1 -C "$runtime/java"
+          tar -xzf "$runtime/keycloak.tar.gz" --strip-components=1 -C "$runtime/keycloak"
+          echo "JAVA_HOME=$runtime/java" >> "$GITHUB_ENV"
+          echo "KEYCLOAK_HOME=$runtime/keycloak" >> "$GITHUB_ENV"
+      - name: Real Keycloak PKCE and network MCP
+        run: |
+          test -x "$JAVA_HOME/bin/java"
+          test -x "$KEYCLOAK_HOME/bin/kc.sh"
+          uv run pytest tests/integration/test_keycloak.py -q
+  integration-gate:
+    if: always()
+    needs: [oauth-provider]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require provider integration success
+        env:
+          RESULT: ${{ needs.oauth-provider.result }}
+        run: test "$RESULT" = success

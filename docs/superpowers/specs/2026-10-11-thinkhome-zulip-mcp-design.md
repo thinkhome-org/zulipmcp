@@ -75,4 +75,4 @@ CI na PR nepoužívá produkční secrets. Publikování až z verzovaného schv
 
 ## Předpoklady k review
 
-Python a externí OAuth provider jsou návrhové volby pro toto vydání. Odmítnutí frontendové práce vykládáme jako zachování OAuth přes externí provider a provisionování přes CLI. Cílový GitHub owner/repository, licence, publikační účty a produkční adresa zatím nebyly určeny; neodvozovat je z názvu ThinkHome a nic nezveřejňovat bez jejich určení.
+Python a externí OAuth provider jsou návrhové volby pro toto vydání. Odmítnutí frontendové práce vykládáme jako zachování OAuth přes externí provider a provisionování přes CLI. Uživatel určil veřejný repozitář `thinkhome-org/zulipmcp`, licenci vlastního kódu MIT a CODEOWNER `SamuelPalubaCZ`. Převzaté materiály Zulipu zachovávají Apache-2.0. Tento účet je autorem současných PR, proto jejich nezávislé schválení musí zajistit jiný účet. Publikační účty a produkční adresa zatím nebyly určeny; neodvozovat je z názvu ThinkHome.
