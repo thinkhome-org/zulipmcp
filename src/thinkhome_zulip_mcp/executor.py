@@ -292,6 +292,183 @@ class Executor:
     ) -> OperationResult:
         if not self.channel_policy.active:
             return await self._execute(principal, operation_id, arguments)
+        if operation_id == "delete-queue":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                expired = (
+                    isinstance(result.data, dict)
+                    and result.data.get("code") == "BAD_EVENT_QUEUE_ID"
+                )
+                return replace(
+                    result, data={"code": "BAD_EVENT_QUEUE_ID"} if expired else None
+                )
+            return replace(result, data={"result": "success"})
+        if operation_id == "register-queue":
+            if self.read_only:
+                return await self._execute(principal, operation_id, arguments)
+            requested = arguments.get("event_types")
+            initial = arguments.get("fetch_event_types", requested)
+            if any(
+                not isinstance(types, list) or any(kind != "message" for kind in types)
+                for types in (requested, initial)
+            ):
+                return OperationResult(
+                    str(uuid4()), error={"code": "channel_policy_not_supported"}
+                )
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            data = result.data
+            queue_id = data.get("queue_id") if isinstance(data, dict) else None
+            cursor = data.get("last_event_id") if isinstance(data, dict) else None
+            if (
+                not isinstance(queue_id, str)
+                or not queue_id
+                or type(cursor) is not int
+                or cursor < -1
+            ):
+                uncertain = True
+                if isinstance(queue_id, str) and queue_id:
+                    cleanup = await self._execute(
+                        principal, "delete-queue", {"queue_id": queue_id}
+                    )
+                    uncertain = cleanup.error is not None
+                return replace(
+                    result,
+                    data=None,
+                    error={"code": "invalid_queue_response"},
+                    uncertain_write=uncertain,
+                )
+            metadata_types = {
+                "queue_id": str,
+                "last_event_id": int,
+                "max_message_id": int,
+                "zulip_version": str,
+                "zulip_feature_level": int,
+                "zulip_merge_base": str,
+                "idle_queue_timeout_secs": int,
+            }
+            return replace(
+                result,
+                data={
+                    "result": "success",
+                    **{
+                        key: data[key]
+                        for key, expected in metadata_types.items()
+                        if key in data and type(data[key]) is expected
+                    },
+                },
+            )
+        if operation_id == "get-events":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                expired = (
+                    isinstance(result.data, dict)
+                    and result.data.get("code") == "BAD_EVENT_QUEUE_ID"
+                )
+                return replace(
+                    result, data={"code": "BAD_EVENT_QUEUE_ID"} if expired else None
+                )
+            events = (
+                result.data.get("events") if isinstance(result.data, dict) else None
+            )
+            if not isinstance(events, list):
+                return replace(
+                    result, data=None, error={"code": "invalid_events_response"}
+                )
+            cursor = arguments.get("last_event_id", -1)
+            visible = []
+            event_channels: dict[int, bool] = {}
+            try:
+                async with asyncio.timeout(30):
+                    for event in events:
+                        if (
+                            not isinstance(event, dict)
+                            or type(event.get("id")) is not int
+                            or event["id"] < 0
+                            or event["id"] <= cursor
+                        ):
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "invalid_events_response"},
+                            )
+                        cursor = event["id"]
+                        if event.get("type") == "heartbeat":
+                            visible.append({"id": cursor, "type": "heartbeat"})
+                            continue
+                        if event.get("type") != "message":
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "channel_policy_event_not_supported"},
+                            )
+                        message = event.get("message")
+                        if (
+                            not isinstance(message, dict)
+                            or type(message.get("id")) is not int
+                            or message["id"] <= 0
+                        ):
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "invalid_events_response"},
+                            )
+                        allowed = False
+                        if message.get("type") in {"private", "direct"}:
+                            allowed = self.channel_policy.allows_dm()
+                        elif message.get("type") == "stream":
+                            stream_id = message.get("stream_id")
+                            if type(stream_id) is not int or stream_id <= 0:
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "invalid_events_response"},
+                                )
+                            if stream_id not in event_channels:
+                                lookup = await self._execute(
+                                    principal,
+                                    "get-stream-by-id",
+                                    {"stream_id": stream_id},
+                                )
+                                stream = (
+                                    lookup.data.get("stream")
+                                    if isinstance(lookup.data, dict)
+                                    else None
+                                )
+                                if (
+                                    lookup.error
+                                    or not isinstance(stream, dict)
+                                    or type(stream.get("stream_id")) is not int
+                                    or stream["stream_id"] != stream_id
+                                    or not isinstance(stream.get("name"), str)
+                                    or type(stream.get("invite_only")) is not bool
+                                ):
+                                    return replace(
+                                        result,
+                                        data=None,
+                                        error={"code": "channel_policy_lookup_failed"},
+                                    )
+                                event_channels[stream_id] = (
+                                    self.channel_policy.allows_channel(
+                                        stream["name"], private=stream["invite_only"]
+                                    )
+                                )
+                            allowed = event_channels[stream_id]
+                        if allowed:
+                            visible.append(event)
+            except TimeoutError:
+                return replace(
+                    result, data=None, error={"code": "channel_policy_lookup_timeout"}
+                )
+            return replace(
+                result,
+                data={
+                    "result": "success",
+                    "events": visible,
+                    "policy_event_cursor": cursor,
+                },
+            )
         if operation_id == "get-messages":
             result = await self._execute(principal, operation_id, arguments)
             if result.error:

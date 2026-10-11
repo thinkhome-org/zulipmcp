@@ -167,6 +167,11 @@ class EventQueues:
                 ):
                     return _error("invalid_events_response", resync=True)
                 cursor = event["id"]
+            if self.executor.channel_policy.active:
+                policy_cursor = result.data.get("policy_event_cursor")
+                if type(policy_cursor) is not int or policy_cursor < cursor:
+                    return _error("invalid_events_response", resync=True)
+                cursor = policy_cursor
             return OperationResult(
                 result.request_id,
                 data={

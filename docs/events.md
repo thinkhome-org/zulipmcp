@@ -70,3 +70,20 @@ This is the event-queue foundation. The reference `listen` workflow still needs
 session context, catch-up, automatic subscription, listening/dismiss reactions,
 renewable long waits, progress notifications and interrupt-file support. Live
 Zulip event delivery and the complete reference parity gate remain unverified.
+
+## Channel-filtered message queues
+
+When channel policies are enabled, explicitly request `event_types=["message"]`
+(and, if supplied, a `fetch_event_types` subset of `message`). Registration removes
+unrelated initial state. Polling checks each message's channel metadata under the
+caller and applies DM rules; heartbeat events retain only ID/type. Other event
+types remain unsupported in this mode.
+
+An empty filtered batch can still advance `next_event_id`. Acknowledge that cursor
+explicitly on the next poll; reusing an earlier cursor permits replay. A metadata
+lookup failure, malformed batch or unsupported type returns no partial batch or
+new cursor. Queue expiry still requires resynchronization.
+
+Authenticated HTTP fixtures exercise registration, filtered polling, cursor
+advancement, owner-only deletion, token revocation and cleanup at shutdown.
+These fixtures simulate Zulip; live-server verification remains pending.
