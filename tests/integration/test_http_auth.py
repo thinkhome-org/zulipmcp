@@ -65,7 +65,9 @@ async def test_http_identity_isolation_revoke_and_session_termination(
                 headers={"kid": "integration"},
             )
     auth = Authenticator(store, config, transport=transport)
-    app = create_http_app(auth, Executor(transport=httpx.MockTransport(upstream)))
+    app = create_http_app(
+        auth, Executor(transport=httpx.MockTransport(upstream)), json_response=True
+    )
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(
