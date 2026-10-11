@@ -1,0 +1,47 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.12.9'
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src
+      - run: uv run pytest
+      - run: uv build
+      - name: Installed wheel smoke
+        run: |
+          uv venv /tmp/mcp-wheel
+          uv pip install --python /tmp/mcp-wheel/bin/python dist/*.whl
+          cd /tmp
+          /tmp/mcp-wheel/bin/thinkhome-zulip-mcp --version
+  ci-gate:
+    if: always()
+    needs: [checks]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require successful checks
+        env:
+          RESULT: ${{ needs.checks.result }}
+        run: test "$RESULT" = success
