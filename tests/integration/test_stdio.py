@@ -30,8 +30,71 @@ async def test_stdio_initialize_list_and_catalog_call(tmp_path):
                     "zulip_search_operations",
                     "zulip_describe_operation",
                     "zulip_execute",
+                    "zulip_batch",
+                    "zulip_history",
+                    "zulip_list_channels",
+                    "zulip_get_channel",
+                    "zulip_get_subscriptions",
+                    "zulip_get_subscription_status",
+                    "zulip_update_subscription_property",
+                    "zulip_update_subscription_settings",
+                    "zulip_unsubscribe",
+                    "zulip_subscribe",
+                    "zulip_update_subscriptions",
+                    "zulip_set_topic_visibility",
+                    "zulip_set_default_channel",
+                    "zulip_mark_channel_read",
+                    "zulip_update_channel_message_flags",
+                    "zulip_archive_channel",
+                    "zulip_update_channel",
+                    "zulip_delete_topic",
+                    "zulip_set_context",
+                    "zulip_end_session",
+                    "zulip_reply",
+                    "zulip_listen",
+                    "zulip_search_messages",
+                    "zulip_construct_narrow",
+                    "zulip_check_matches",
+                    "zulip_search_topics",
+                    "zulip_advanced_search",
+                    "zulip_multi_channel_history",
+                    "zulip_message_context",
+                    "zulip_edit_message",
+                    "zulip_get_message",
+                    "zulip_get_users",
+                    "zulip_get_user",
+                    "zulip_get_own_user",
+                    "zulip_resolve_user",
+                    "zulip_get_presence",
+                    "zulip_get_user_status",
+                    "zulip_get_user_groups",
+                    "zulip_get_user_group_members",
+                    "zulip_is_user_group_member",
+                    "zulip_update_status",
+                    "zulip_manage_user_mute",
+                    "zulip_add_reaction",
+                    "zulip_remove_reaction",
+                    "zulip_send_message",
+                    "zulip_send_direct_message",
+                    "zulip_move_messages",
+                    "zulip_resolve_topic",
                     "zulip_capabilities",
+                    "zulip_download_file",
+                    "zulip_register_events",
+                    "zulip_poll_events",
+                    "zulip_delete_events",
                 }
+                batch = await session.call_tool(
+                    "zulip_batch",
+                    {
+                        "operations": [
+                            {"operation_id": "unknown", "arguments": {}},
+                            {"operation_id": "unknown", "arguments": {}},
+                        ]
+                    },
+                )
+                assert batch.is_error
+                assert batch.structured_content["data"]["not_attempted"] == [1]
                 search = await session.call_tool(
                     "zulip_search_operations", {"query": "send-message"}
                 )
@@ -133,3 +196,36 @@ async def test_stdio_execute_reaches_only_the_configured_test_server(tmp_path):
         upstream.shutdown()
         upstream.server_close()
         thread.join(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_stdio_stages_only_files_under_configured_root(tmp_path):
+    root = tmp_path / "allowed"
+    root.mkdir()
+    (root / "hello.txt").write_bytes(b"hello")
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "thinkhome_zulip_mcp", "serve", "--transport", "stdio"],
+        env={
+            "ZULIP_URL": "https://unused.example.invalid",
+            "ZULIP_EMAIL": "test@example.invalid",
+            "ZULIP_API_KEY": "synthetic",
+            "ZULIP_FILE_ROOT": str(root),
+            "TMPDIR": str(runtime),
+        },
+    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            assert "zulip_stage_file" in {tool.name for tool in tools.tools}
+            result = await session.call_tool("zulip_stage_file", {"path": "hello.txt"})
+            assert not result.is_error
+            assert result.structured_content["size"] == 5
+            assert result.structured_content["filename"] == "hello.txt"
+            assert len(result.structured_content["handle"]) > 30
+            denied = await session.call_tool("zulip_stage_file", {"path": "../outside"})
+            assert denied.is_error
+    assert list(runtime.glob("zulip-mcp-*")) == []
