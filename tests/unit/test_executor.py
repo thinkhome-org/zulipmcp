@@ -292,3 +292,91 @@ def test_principal_rejects_ambiguous_url_configuration(url):
 
     with pytest.raises(ValueError):
         Principal("a", url, "a@example.test", "fake")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operation_id", "prefix"),
+    [
+        ("get-file-temporary-url", "user_uploads"),
+        ("check-thumbnail-status", "thumbnail/status"),
+    ],
+)
+async def test_attachment_path_converter_preserves_segments(operation_id, prefix):
+    from thinkhome_zulip_mcp.executor import Executor, Principal
+
+    requests = []
+
+    def upstream(request):
+        requests.append(request)
+        return httpx.Response(
+            200, json={"result": "success", "url": "/user_uploads/temporary/token/name"}
+        )
+
+    result = await Executor(transport=httpx.MockTransport(upstream)).execute(
+        Principal("a", "https://zulip.example", "a@example.test", "fake"),
+        operation_id,
+        {"realm_id_str": 1, "filename": "ab/random/žlutý soubor.txt"},
+    )
+    assert result.error is None
+    assert requests[0].url.raw_path == (
+        f"/api/v1/{prefix}/1/ab/random/%C5%BElut%C3%BD%20soubor.txt".encode()
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "../x",
+        "a/../x",
+        "a/./x",
+        "a//x",
+        "/x",
+        "a/",
+        "a/%2e%2e/x",
+        "a/%252f/x",
+        "a/\\x",
+        "a/\x00x",
+    ],
+)
+async def test_attachment_path_converter_rejects_traversal(filename):
+    from thinkhome_zulip_mcp.executor import Executor, Principal
+
+    def upstream(request):
+        pytest.fail("Unsafe path reached upstream")
+
+    result = await Executor(transport=httpx.MockTransport(upstream)).execute(
+        Principal("a", "https://zulip.example", "a@example.test", "fake"),
+        "get-file-temporary-url",
+        {"realm_id_str": 1, "filename": filename},
+    )
+    assert result.error["code"] == "invalid_arguments"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation, argument, path",
+    [
+        ("get-user-groups", "include_deactivated_groups", "/api/v1/user_groups"),
+        ("get-channel-folders", "include_archived", "/api/v1/channel_folders"),
+    ],
+)
+async def test_zulip_get_form_schemas_are_sent_as_query_parameters(
+    operation, argument, path
+):
+    from thinkhome_zulip_mcp.executor import Executor, Principal
+
+    def upstream(request):
+        assert request.method == "GET"
+        assert request.url.path == path
+        assert request.url.params[argument] == "true"
+        assert request.content == b""
+        return httpx.Response(200, json={"result": "success"})
+
+    result = await Executor(transport=httpx.MockTransport(upstream)).execute(
+        Principal("alice", "https://zulip.example", "alice", "synthetic"),
+        operation,
+        {argument: True},
+    )
+    assert result.error is None
