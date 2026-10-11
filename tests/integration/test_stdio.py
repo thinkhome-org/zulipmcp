@@ -1,0 +1,135 @@
+"""A real child process must speak MCP on stdout with no Zulip network access."""
+
+import sys
+
+import pytest
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
+
+
+@pytest.mark.asyncio
+async def test_stdio_initialize_list_and_catalog_call(tmp_path):
+    secret = tmp_path / "key"
+    secret.write_text("synthetic-stdio-secret")
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "thinkhome_zulip_mcp", "serve", "--transport", "stdio"],
+        env={
+            "ZULIP_URL": "https://unused.example.invalid",
+            "ZULIP_EMAIL": "test@example.invalid",
+            "ZULIP_API_KEY_FILE": str(secret),
+        },
+    )
+    with (tmp_path / "stderr").open("w+") as errors:
+        async with stdio_client(params, errlog=errors) as (read, write):
+            async with ClientSession(read, write) as session:
+                result = await session.initialize()
+                assert result.server_info.name == "ThinkHome Zulip MCP"
+                listed = await session.list_tools()
+                assert {t.name for t in listed.tools} == {
+                    "zulip_search_operations",
+                    "zulip_describe_operation",
+                    "zulip_execute",
+                    "zulip_capabilities",
+                }
+                search = await session.call_tool(
+                    "zulip_search_operations", {"query": "send-message"}
+                )
+                assert (
+                    search.structured_content["operations"][0]["operation_id"]
+                    == "send-message"
+                )
+                caps = await session.call_tool("zulip_capabilities", {})
+                assert (
+                    caps.structured_content["permissions"]
+                    == "unknown; enforced by Zulip"
+                )
+                assert caps.structured_content["full_coverage"] is False
+                rejected = await session.call_tool(
+                    "zulip_execute", {"operation_id": "unknown", "arguments": {}}
+                )
+                assert rejected.is_error
+                assert (
+                    rejected.structured_content["error"]["code"] == "unknown_operation"
+                )
+        errors.seek(0)
+        assert "synthetic-stdio-secret" not in errors.read()
+
+
+@pytest.mark.asyncio
+async def test_stdio_execute_reaches_only_the_configured_test_server(tmp_path):
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import parse_qs
+
+    received = []
+
+    class Upstream(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received.append(
+                (
+                    self.path,
+                    parse_qs(
+                        self.rfile.read(int(self.headers["Content-Length"])).decode()
+                    ),
+                )
+            )
+            body = json.dumps({"result": "success", "id": 73}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    upstream = ThreadingHTTPServer(("127.0.0.1", 0), Upstream)
+    thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    thread.start()
+    secret = tmp_path / "key"
+    secret.write_text("synthetic-local-key")
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "thinkhome_zulip_mcp", "serve", "--transport", "stdio"],
+        env={
+            "ZULIP_URL": f"http://127.0.0.1:{upstream.server_port}",
+            "ZULIP_EMAIL": "test@example.invalid",
+            "ZULIP_API_KEY_FILE": str(secret),
+            "ZULIP_ALLOW_INSECURE_HTTP": "1",
+        },
+    )
+    try:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "zulip_execute",
+                    {
+                        "operation_id": "send-message",
+                        "arguments": {
+                            "type": "stream",
+                            "to": 10,
+                            "topic": "Testing",
+                            "content": "hello",
+                        },
+                    },
+                )
+                assert not result.is_error
+                assert result.structured_content["data"]["id"] == 73
+        assert received == [
+            (
+                "/api/v1/messages",
+                {
+                    "type": ["stream"],
+                    "to": ["10"],
+                    "topic": ["Testing"],
+                    "content": ["hello"],
+                },
+            )
+        ]
+    finally:
+        upstream.shutdown()
+        upstream.server_close()
+        thread.join(timeout=5)

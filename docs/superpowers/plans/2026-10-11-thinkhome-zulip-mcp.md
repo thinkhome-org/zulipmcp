@@ -92,8 +92,8 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 
 - [ ] Napsat testy `test_wire_encoding_for_each_operation`, `test_unknown_arguments_are_rejected`, `test_read_retries_respect_retry_after`, `test_write_timeout_is_not_retried`, `test_redirect_does_not_leak_credentials`.
 - [ ] Implementovat správné path/query/form/JSON serializace a upstream chyby bez ztráty detailu potřebného klientovi; validovat cílový origin a velikost odpovědi.
-- [ ] Přidat katalogové nástroje a MCP anotace pro čtení/zápis/destruktivitu; anotace nejsou autorizační kontrola.
-- [ ] Přidat procesový test skutečného stdio initialize/list/call; stdout pouze MCP, logy na stderr bez secretů.
+- [x] Přidat katalogové nástroje a MCP anotace pro čtení/zápis/destruktivitu; anotace nejsou autorizační kontrola.
+- [x] Přidat procesový test skutečného stdio initialize/list/call; stdout pouze MCP, logy na stderr bez secretů.
 - [ ] Ověřit unit/contract testy a CLI start; zdokumentovat konfiguraci a příklady. Commit `feat: execute catalog operations over stdio`; push a PR.
 
 ## Úloha 4 — Více uživatelů, tokeny a HTTP autorizace

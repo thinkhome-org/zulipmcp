@@ -1,0 +1,388 @@
+"""Validated catalog requests under an immutable, provisioned Zulip identity."""
+
+import asyncio
+import json
+import math
+from collections.abc import Awaitable, Callable
+from copy import deepcopy
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from typing import Any
+from urllib.parse import quote, unquote, urlsplit
+from uuid import uuid4
+
+import httpx
+from jsonschema import Draft7Validator
+from referencing import Registry
+
+from thinkhome_zulip_mcp.catalog import (
+    Operation,
+    load_catalog,
+    load_document,
+    resolve_reference,
+)
+
+
+@dataclass(frozen=True)
+class Principal:
+    identity_id: str
+    realm_url: str
+    email: str
+    api_key: str = field(repr=False)
+    allow_insecure_http: bool = False
+
+    def __post_init__(self) -> None:
+        if any(ord(char) < 33 for char in self.realm_url) or "\\" in self.realm_url:
+            raise ValueError("Invalid provisioned Zulip URL")
+        parsed = urlsplit(self.realm_url)
+        _ = parsed.port
+        if (
+            parsed.scheme
+            not in ({"https", "http"} if self.allow_insecure_http else {"https"})
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or not self.identity_id
+            or not self.email
+            or not self.api_key
+        ):
+            raise ValueError("Invalid provisioned Zulip identity or URL")
+
+
+@dataclass(frozen=True)
+class OperationResult:
+    request_id: str
+    data: Any = None
+    error: dict[str, Any] | None = None
+    status_code: int | None = None
+    uncertain_write: bool = False
+    retry_after: str | None = None
+
+
+def _normalize_schema(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    if "$ref" in value and not str(value["$ref"]).startswith("#/"):
+        raise ValueError("External schema references are not allowed")
+    normalized = deepcopy(value)
+    nullable = normalized.pop("nullable", False)
+    for key in ("properties", "patternProperties", "definitions", "$defs"):
+        if key in normalized:
+            normalized[key] = {
+                name: _normalize_schema(v) for name, v in normalized[key].items()
+            }
+    for key in ("allOf", "anyOf", "oneOf"):
+        if key in normalized:
+            normalized[key] = [_normalize_schema(v) for v in normalized[key]]
+    for key in (
+        "items",
+        "additionalProperties",
+        "not",
+        "if",
+        "then",
+        "else",
+        "contains",
+    ):
+        if key in normalized:
+            v = normalized[key]
+            normalized[key] = (
+                [_normalize_schema(item) for item in v]
+                if isinstance(v, list)
+                else _normalize_schema(v)
+            )
+    if nullable:
+        if "type" in normalized:
+            normalized["type"] = [normalized["type"], "null"]
+        else:
+            normalized = {"anyOf": [normalized, {"type": "null"}]}
+    for name, bound in [
+        ("exclusiveMinimum", "minimum"),
+        ("exclusiveMaximum", "maximum"),
+    ]:
+        if isinstance(normalized.get(name), bool):
+            exclusive = normalized.pop(name)
+            if exclusive and bound in normalized:
+                normalized[name] = normalized.pop(bound)
+    return normalized
+
+
+def _finite_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("Non-finite JSON number")
+    return number
+
+
+def _wire_value(value: Any, json_encoded: bool) -> str:
+    if json_encoded:
+        return json.dumps(
+            value, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+        )
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int) or isinstance(value, float) and math.isfinite(value):
+        return str(value)
+    raise ValueError("Input requires a declared JSON encoding")
+
+
+class Executor:
+    def __init__(
+        self,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+        max_response_bytes: int = 8 * 1024 * 1024,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    ) -> None:
+        if max_response_bytes <= 0:
+            raise ValueError("Response limit must be positive")
+        self.document = load_document()
+        self.catalog = load_catalog()
+        self.components = deepcopy(self.document["components"])
+        self.components["schemas"] = {
+            name: _normalize_schema(schema)
+            for name, schema in self.components["schemas"].items()
+        }
+        self.sleep = sleep
+        self.transport = transport
+        self.max_response_bytes = max_response_bytes
+
+    def _validate(self, schema: dict[str, Any], value: Any) -> None:
+        full_schema = {**_normalize_schema(schema), "components": self.components}
+        errors = Draft7Validator(full_schema, registry=Registry()).iter_errors(value)
+        error = next(errors, None)
+        if error:
+            location = ".".join(str(part) for part in error.absolute_path) or "input"
+            raise ValueError(f"Invalid value at {location} ({error.validator})")
+
+    def _prepare(
+        self, operation: Operation, arguments: dict[str, Any]
+    ) -> tuple[str, dict[str, str], dict[str, str], Any, bool]:
+        json.dumps(arguments, allow_nan=False)
+        definition = operation.definition
+        path = operation.path
+        parameters = {}
+        for raw in operation.path_parameters + definition.get("parameters", []):
+            parameter = resolve_reference(self.document, raw)
+            parameters[(parameter["in"], parameter["name"])] = parameter
+        body = resolve_reference(self.document, definition.get("requestBody", {}))
+        content_types = body.get("content", {})
+        media = next(
+            (
+                m
+                for m in ["application/x-www-form-urlencoded", "application/json"]
+                if m in content_types
+            ),
+            None,
+        )
+        if content_types and media is None:
+            raise NotImplementedError(
+                "This operation requires a binary transfer adapter"
+            )
+        content = content_types[media] if media else {}
+        body_schema = resolve_reference(self.document, content.get("schema", {}))
+        properties = body_schema.get("properties", {})
+        allowed = set(properties) | {p["name"] for p in parameters.values()}
+        if set(arguments) - allowed:
+            raise ValueError("Unknown operation arguments")
+        query = {}
+        for parameter in parameters.values():
+            name = parameter["name"]
+            if name not in arguments:
+                if parameter.get("required"):
+                    raise ValueError(f"Missing required argument: {name}")
+                continue
+            value = arguments[name]
+            encoded = "application/json" in parameter.get("content", {})
+            schema = (
+                parameter["content"]["application/json"]["schema"]
+                if encoded
+                else parameter["schema"]
+            )
+            self._validate(schema, value)
+            if parameter["in"] == "path":
+                segment = str(value)
+                decoded = segment
+                for _ in range(4):
+                    decoded = unquote(decoded)
+                if decoded in {".", ".."} or any(c in decoded for c in "/\\\x00"):
+                    raise ValueError("Unsafe path parameter")
+                path = path.replace("{" + name + "}", quote(segment, safe=""))
+            elif parameter["in"] == "query":
+                query[name] = _wire_value(value, encoded)
+            else:
+                raise NotImplementedError("Unsupported parameter location")
+        if "{" in path or "}" in path:
+            raise ValueError("Missing path parameter")
+        values = {key: value for key, value in arguments.items() if key in properties}
+        form = {}
+        json_body = None
+        if content:
+            self._validate(body_schema, values)
+            if media == "application/json":
+                json_body = values
+            else:
+                encoding = content.get("encoding", {})
+                form = {
+                    key: _wire_value(
+                        value,
+                        encoding.get(key, {}).get("contentType") == "application/json",
+                    )
+                    for key, value in values.items()
+                }
+        authenticated = (
+            definition.get("security", self.document.get("security", [])) != []
+        )
+        return path, query, form, json_body, authenticated
+
+    async def execute(
+        self, principal: Principal, operation_id: str, arguments: dict[str, Any]
+    ) -> OperationResult:
+        request_id = str(uuid4())
+        operation = self.catalog.get(operation_id)
+        if operation is None:
+            return OperationResult(request_id, error={"code": "unknown_operation"})
+        if operation.path.startswith(("/dev_", "/remotes/")) or operation_id in {
+            "fetch-api-key",
+            "jwt-fetch-api-key",
+        }:
+            return OperationResult(
+                request_id, error={"code": "requires_separate_authentication_adapter"}
+            )
+        try:
+            path, query, form, json_body, authenticated = self._prepare(
+                operation, arguments
+            )
+        except (ValueError, TypeError) as exc:
+            return OperationResult(
+                request_id, error={"code": "invalid_arguments", "message": str(exc)}
+            )
+        except NotImplementedError as exc:
+            return OperationResult(
+                request_id, error={"code": "unsupported_operation", "message": str(exc)}
+            )
+        safe_read = operation.definition.get("x-thinkhome", {}).get("safe_read") is True
+        for attempt in range(3):
+            result = await self._send(
+                request_id,
+                principal,
+                operation,
+                path,
+                query,
+                form,
+                json_body,
+                authenticated,
+            )
+            retryable = result.status_code in {429, 502, 503, 504} or (
+                result.error is not None
+                and result.error["code"] == "upstream_transport_error"
+            )
+            if not safe_read or not retryable or attempt == 2:
+                return result
+            delay = float(2**attempt)
+            if result.retry_after is not None:
+                try:
+                    delay = float(result.retry_after)
+                except ValueError:
+                    try:
+                        date = parsedate_to_datetime(result.retry_after)
+                        delay = (date - datetime.now(UTC)).total_seconds()
+                    except (ValueError, TypeError, OverflowError):
+                        return result
+                if not math.isfinite(delay) or delay > 30:
+                    return result
+            await self.sleep(max(0.0, delay))
+        raise AssertionError("Retry loop exhausted without a result")
+
+    async def _send(
+        self,
+        request_id: str,
+        principal: Principal,
+        operation: Operation,
+        path: str,
+        query: dict[str, str],
+        form: dict[str, str],
+        json_body: Any,
+        authenticated: bool,
+    ) -> OperationResult:
+        url = principal.realm_url.rstrip("/") + "/api/v1" + path
+        is_write = (
+            operation.method not in {"GET", "HEAD", "OPTIONS"}
+            or operation.definition.get("x-thinkhome", {}).get("safe_read") is False
+        )
+        try:
+            # A client belongs to one call; cookies never cross principals.
+            async with httpx.AsyncClient(
+                transport=self.transport,
+                follow_redirects=False,
+                timeout=httpx.Timeout(30),
+                trust_env=False,
+            ) as client:
+                async with client.stream(
+                    operation.method,
+                    url,
+                    params=query,
+                    data=form or None,
+                    json=json_body,
+                    auth=httpx.BasicAuth(principal.email, principal.api_key)
+                    if authenticated
+                    else None,
+                ) as response:
+                    if 300 <= response.status_code < 400:
+                        return OperationResult(
+                            request_id,
+                            data={"location": response.headers.get("location")},
+                            status_code=response.status_code,
+                        )
+                    body = bytearray()
+                    async for chunk in response.aiter_bytes(chunk_size=65536):
+                        if len(body) + len(chunk) > self.max_response_bytes:
+                            return OperationResult(
+                                request_id,
+                                error={"code": "response_too_large"},
+                                status_code=response.status_code,
+                                retry_after=response.headers.get("retry-after"),
+                                uncertain_write=is_write,
+                            )
+                        body.extend(chunk)
+                    try:
+                        data = (
+                            json.loads(
+                                body,
+                                parse_float=_finite_float,
+                                parse_constant=_finite_float,
+                            )
+                            if body
+                            else None
+                        )
+                    except (ValueError, UnicodeError):
+                        return OperationResult(
+                            request_id,
+                            error={"code": "invalid_upstream_response"},
+                            status_code=response.status_code,
+                            retry_after=response.headers.get("retry-after"),
+                            uncertain_write=is_write,
+                        )
+                    failed = (
+                        response.is_error
+                        or isinstance(data, dict)
+                        and data.get("result") == "error"
+                    )
+                    return OperationResult(
+                        request_id,
+                        data=data,
+                        error={"code": "upstream_error"} if failed else None,
+                        uncertain_write=is_write and failed,
+                        status_code=response.status_code,
+                        retry_after=response.headers.get("retry-after"),
+                    )
+        except httpx.TransportError:
+            return OperationResult(
+                request_id,
+                error={"code": "upstream_transport_error"},
+                uncertain_write=is_write,
+            )

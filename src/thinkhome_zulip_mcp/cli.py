@@ -11,5 +11,21 @@ def main() -> None:
         action="version",
         version=f"%(prog)s {version('thinkhome-zulip-mcp')}",
     )
-    parser.parse_args()
-    parser.print_help()
+    commands = parser.add_subparsers(dest="command")
+    serve = commands.add_parser("serve", help="Run an MCP transport")
+    serve.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    args = parser.parse_args()
+    if args.command != "serve":
+        parser.print_help()
+        return
+    if args.transport != "stdio":
+        parser.error(
+            "HTTP transport requires the pending multi-user authorization layer"
+        )
+    from thinkhome_zulip_mcp.server import create_server, principal_from_environment
+
+    try:
+        principal = principal_from_environment()
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+    create_server(principal).run(transport="stdio")
