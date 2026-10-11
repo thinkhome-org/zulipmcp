@@ -1,0 +1,155 @@
+{
+  "aliases": [
+    {
+      "path": "/settings/display",
+      "method": "patch",
+      "target_path": "/settings",
+      "target_method": "patch",
+      "operationId": "update-settings-display-legacy",
+      "metadata": {
+        "stability": "undocumented",
+        "authentication": "zulip_api_key",
+        "role_policy": "human_users_only; self",
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "handler": "zerver.views.user_settings.json_change_settings",
+        "evidence": [
+          "zproject/urls.py:526-534",
+          "zerver/views/user_settings.py:260-440",
+          "zerver/lib/rest.py:117-210",
+          "zerver/decorator.py:560-575"
+        ],
+        "side_effects": [
+          "Updates settings of the authenticated user; all canonical settings are accepted."
+        ],
+        "schema_review": "source-reviewed",
+        "integration_status": "not-tested",
+        "feature_level": "unknown; audited on 12.3"
+      }
+    },
+    {
+      "path": "/settings/notifications",
+      "method": "patch",
+      "target_path": "/settings",
+      "target_method": "patch",
+      "operationId": "update-settings-notifications-legacy",
+      "metadata": {
+        "stability": "undocumented",
+        "authentication": "zulip_api_key",
+        "role_policy": "human_users_only; self",
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "handler": "zerver.views.user_settings.json_change_settings",
+        "evidence": [
+          "zproject/urls.py:526-534",
+          "zerver/views/user_settings.py:260-440",
+          "zerver/lib/rest.py:117-210",
+          "zerver/decorator.py:560-575"
+        ],
+        "side_effects": [
+          "Updates settings of the authenticated user; all canonical settings are accepted."
+        ],
+        "schema_review": "source-reviewed",
+        "integration_status": "not-tested",
+        "feature_level": "unknown; audited on 12.3"
+      }
+    }
+  ],
+  "paths": {
+    "/users/me/onboarding_steps": {
+      "post": {
+        "operationId": "mark-onboarding-step-read",
+        "summary": "Mark a personal onboarding step as read",
+        "description": "Undocumented human-user endpoint. Omit reminder delay unless scheduling for navigation_tour_video. JSON null is not accepted for the delay; scheduling policy is checked by Zulip.",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "onboarding_step": {
+                    "type": "string",
+                    "enum": [
+                      "visibility_policy_banner",
+                      "intro_inbox_view_modal",
+                      "intro_recent_view_modal",
+                      "first_stream_created_banner",
+                      "jump_to_conversation_banner",
+                      "non_interleaved_view_messages_fading",
+                      "interleaved_view_messages_fading",
+                      "intro_resolve_topic",
+                      "navigation_tour_video",
+                      "intro_go_to_conversation_tooltip",
+                      "narrow_to_dm_with_welcome_bot_new_user"
+                    ]
+                  },
+                  "schedule_navigation_tour_video_reminder_delay": {
+                    "type": "integer",
+                    "description": "Seconds until a welcome-video reminder; only for navigation_tour_video."
+                  }
+                },
+                "required": [
+                  "onboarding_step"
+                ],
+                "anyOf": [
+                  {
+                    "not": {
+                      "required": [
+                        "schedule_navigation_tour_video_reminder_delay"
+                      ]
+                    }
+                  },
+                  {
+                    "properties": {
+                      "onboarding_step": {
+                        "enum": [
+                          "navigation_tour_video"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {
+                "schedule_navigation_tour_video_reminder_delay": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The step was recorded and any requested reminder scheduled."
+          }
+        },
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "human_users_only; self",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.onboarding_steps.mark_onboarding_step_as_read",
+          "evidence": [
+            "zproject/urls.py:516-525",
+            "zerver/views/onboarding_steps.py:23-75",
+            "zerver/lib/onboarding_steps.py:1-75",
+            "zerver/tests/test_onboarding_steps.py:80-130",
+            "zerver/lib/rest.py:117-210",
+            "zerver/decorator.py:560-575"
+          ],
+          "side_effects": [
+            "Marks onboarding step read for caller.",
+            "May schedule a welcome-bot reminder message."
+          ],
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        }
+      }
+    }
+  }
+}

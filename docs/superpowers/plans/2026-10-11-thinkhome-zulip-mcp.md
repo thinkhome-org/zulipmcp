@@ -63,11 +63,13 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 
 **Rozhraní:** CLI `thinkhome-zulip-mcp --version`, `serve --transport stdio|http`, později `identity` a `token` podřízené příkazy. Import balíčku nesmí provádět síťová volání.
 
-- [ ] Založit repo workflow podle bootstrap pravidla, zdokumentovat vývojové prostředí a tajné údaje mimo Git.
-- [ ] Napsat test `test_cli_version` a `test_import_has_no_network_access`; spustit a zaznamenat očekávaný neúspěch před implementací.
-- [ ] Přidat minimální balíček a CI s Ruff, mypy, pytest a sestavením wheel/sdist.
-- [ ] Ověřit `uv sync --frozen`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`, `uv run pytest tests/unit`, `uv build`.
-- [ ] Aktualizovat README/CONTRIBUTING a commit `ci: bootstrap package and contribution checks`; push a PR.
+- [x] Založit repo workflow podle bootstrap pravidla, zdokumentovat vývojové prostředí a tajné údaje mimo Git.
+- [x] Napsat test `test_cli_version` a `test_import_has_no_network_access`; spustit a zaznamenat očekávaný neúspěch před implementací.
+- [x] Přidat minimální balíček a CI s Ruff, mypy, pytest a sestavením wheel/sdist.
+- [x] Ověřit `uv sync --frozen`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src`, `uv run pytest tests/unit`, `uv build`.
+- [x] Aktualizovat README/CONTRIBUTING a commit `ci: bootstrap package and contribution checks`; push a PR.
+
+**Evidence:** commits `ead2e0a`/`75f0539`, draft PR #2, CI run `38106022812` passed Python 3.12/3.14. Review/merge pending. `serve` is deferred to real transport implementation in tasks 3–4, not a no-op command.
 
 ## Úloha 2 — Úplný inventář veřejného a nedokumentovaného API
 

@@ -16,8 +16,9 @@ uv sync --frozen
 uv run thinkhome-zulip-mcp --version
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
+uv run mypy src scripts
 uv run pytest
+uv run python scripts/catalog.py check
 uv build
 ```
 

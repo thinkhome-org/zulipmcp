@@ -10,12 +10,13 @@ select the license for our own implementation.
 
 ## Current evidence
 
-- 158 schema operations loaded after three explicitly documented exclusions.
+- 158 upstream schema operations after three documentation-only exclusions, plus
+  3 source-reviewed additions (two settings aliases and onboarding).
 - 0 executable operations, 0 wire-contract-tested operations, 0 integration-tested
   operations. Catalog tests verify schema retention and duplicate/missing ID checks.
 - The three documentation-only paths are listed in `data/exclusions.json`, with
   evidence from upstream `zerver/tests/test_openapi.py:241-249`.
-- 158 is **not** a claim about total application API coverage. The schema includes
+- 161 is **not** a claim about total application API coverage. The schema includes
   development/bouncer APIs and does not describe all application operations.
 
 ## Outstanding audit
@@ -31,3 +32,38 @@ updates, bot management and onboarding; their complete schemas, roles and sessio
 requirements are not yet audited. They remain required work before v1.
 
 No operation may be declared implemented merely because its metadata loads.
+
+## Reproducible source evidence
+
+`data/routes.json` contains 451 static route records from six upstream URL files,
+359 handler signatures/decorator lists, and SHA-256 hashes of 90 source files.
+These include HTML pages, optional server components and include declarations:
+451 is not a count of callable API operations. Every route still requires final
+classification; signatures alone do not account for indirect validation or permissions.
+Dynamic route expansion, external packages such as SCIM, and handler bodies remain
+part of the audit. Source files are parsed as Python syntax, never imported or run.
+
+```sh
+uv run python scripts/catalog.py check
+uv run python scripts/catalog.py check --source-root /path/to/zulip-12.3
+uv run python scripts/catalog.py update --source-root /path/to/zulip-12.3
+uv run python scripts/catalog.py check --require-reviewed
+```
+
+The first command checks the pinned schema and local evidence consistency.
+The second additionally reproduces the snapshot from supplied upstream files.
+`update` rewrites generated evidence for review; it never declares routes reviewed.
+`--require-reviewed` currently fails deliberately: pending audit and unimplemented
+operations must block a complete release. A green ordinary check is not that gate.
+
+## First reviewed undocumented additions
+
+| Operation | Input/authentication evidence | Execution |
+|---|---|---|
+| PATCH `/settings/display` | Same human-user handler and full schema as `/settings` | Not implemented |
+| PATCH `/settings/notifications` | Same human-user handler and full schema as `/settings` | Not implemented |
+| POST `/users/me/onboarding_steps` | Human caller; step name and optional JSON-encoded reminder delay; source role and cross-field constraints retained | Not implemented |
+
+Overlay source references, side effects and unknown feature levels are stored in
+`data/overlays.json`. No integration verification is claimed. The onboarding
+operation can schedule a welcome-bot reminder; it is not classified as read-only.

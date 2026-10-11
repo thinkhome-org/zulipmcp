@@ -1,6 +1,7 @@
 """Load the pinned upstream schema without discarding parameter definitions."""
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from importlib.resources import files
 from typing import Any
@@ -51,6 +52,27 @@ def load_document() -> dict[str, Any]:
     )
     if not isinstance(document, dict):
         raise ValueError("Invalid bundled OpenAPI document")
+    overlays = json.loads(
+        files("thinkhome_zulip_mcp").joinpath("data/overlays.json").read_text()
+    )
+    for alias in overlays["aliases"]:
+        definition = deepcopy(
+            document["paths"][alias["target_path"]][alias["target_method"]]
+        )
+        definition["operationId"] = alias["operationId"]
+        definition["x-thinkhome"] = alias["metadata"]
+        destination = document["paths"].setdefault(alias["path"], {})
+        if alias["method"] in destination:
+            raise ValueError(
+                f"Overlay overwrites an upstream operation: {alias['path']}"
+            )
+        destination[alias["method"]] = definition
+    for path, item in overlays["paths"].items():
+        destination = document["paths"].setdefault(path, {})
+        for method, definition in item.items():
+            if method in destination:
+                raise ValueError(f"Overlay overwrites an upstream operation: {path}")
+            destination[method] = definition
     return document
 
 
