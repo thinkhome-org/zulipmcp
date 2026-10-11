@@ -70,6 +70,7 @@ The windborne compatibility profile's default-private-denial remains pending.
 | `send-message` | Resolve and validate channel metadata, enforce read/write rules, send to the checked numeric ID; apply DM restriction for direct messages. |
 | `get-streams` | Validate each channel and filter the list under the current caller. |
 | `get-stream-id`, `get-stream-by-id` | Check current channel name/privacy before returning metadata or ID. |
+| `get-messages` | Filter each page using current per-caller channel metadata and the DM rule; preserve traversal bounds for pagination. |
 | `get-message` | Validate exact message ID, check current channel metadata or the DM rule before returning content. |
 | `update-message`, `delete-message`, `add-reaction`, `remove-reaction` | Validate input, check source-message access and source-channel write rules; moves also check the destination. Read-only denials precede metadata requests. |
 | `get-stream-topics`, `get-subscribers`, `get-subscription-status` | Check channel metadata before fetching the requested data. |
@@ -106,3 +107,21 @@ The complete endpoint source audit is still in progress. New endpoint additions
 must be reviewed for side effects, including GET endpoints; an HTTP method alone
 is insufficient evidence. Channel policies still need guards for reads and other mutations, response
 filtering, batch/event/history bypass tests and configurable agent/admin policies. This page does not claim full reference-policy parity.
+
+## Filtered history pagination
+
+When channel filtering is active, `get-messages` returns `policy_page` with the
+first/last upstream message IDs and the original page count. These are pagination
+metadata: they can include IDs of messages whose content was removed. This policy
+filters message content and channel access; it does not conceal the existence or
+number of underlying messages. Unexpected upstream fields and upstream-supplied
+`policy_page` are discarded.
+
+`zulip_history` advances using these bounds even when all messages were filtered
+out. An empty visible page with `exhausted=false` means continue with `next_cursor`.
+Metadata lookups use the current caller, cache only within one page and have a
+30-second overall filtering deadline. Failed/malformed lookups fail the whole page
+without content or a new cursor, so transient failures cannot silently skip data.
+
+Concurrent changes to channel metadata or messages remain possible between calls;
+this is not a consistent snapshot. Event filtering remains pending.

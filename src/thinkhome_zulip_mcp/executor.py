@@ -292,6 +292,100 @@ class Executor:
     ) -> OperationResult:
         if not self.channel_policy.active:
             return await self._execute(principal, operation_id, arguments)
+        if operation_id == "get-messages":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            data = result.data
+            messages = data.get("messages") if isinstance(data, dict) else None
+            if not isinstance(messages, list) or any(
+                not isinstance(message, dict)
+                or type(message.get("id")) is not int
+                or message["id"] <= 0
+                for message in messages
+            ):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            ids = [message["id"] for message in messages]
+            if any(a >= b for a, b in zip(ids, ids[1:], strict=False)):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            channels: dict[int, bool] = {}
+            visible = []
+            try:
+                async with asyncio.timeout(30):
+                    for message in messages:
+                        if message.get("type") in {"direct", "private"}:
+                            if self.channel_policy.allows_dm():
+                                visible.append(message)
+                        elif message.get("type") == "stream":
+                            stream_id = message.get("stream_id")
+                            if type(stream_id) is not int or stream_id <= 0:
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "invalid_upstream_response"},
+                                )
+                            if stream_id not in channels:
+                                lookup = await self._execute(
+                                    principal,
+                                    "get-stream-by-id",
+                                    {"stream_id": stream_id},
+                                )
+                                stream = (
+                                    lookup.data.get("stream")
+                                    if isinstance(lookup.data, dict)
+                                    else None
+                                )
+                                if (
+                                    lookup.error
+                                    or not isinstance(stream, dict)
+                                    or type(stream.get("stream_id")) is not int
+                                    or stream["stream_id"] != stream_id
+                                    or not isinstance(stream.get("name"), str)
+                                    or type(stream.get("invite_only")) is not bool
+                                ):
+                                    return replace(
+                                        result,
+                                        data=None,
+                                        error={"code": "channel_policy_lookup_failed"},
+                                    )
+                                channels[stream_id] = (
+                                    self.channel_policy.allows_channel(
+                                        stream["name"], private=stream["invite_only"]
+                                    )
+                                )
+                            if channels[stream_id]:
+                                visible.append(message)
+            except TimeoutError:
+                return replace(
+                    result, data=None, error={"code": "channel_policy_lookup_timeout"}
+                )
+            metadata = {
+                key: data[key]
+                for key in (
+                    "found_oldest",
+                    "found_newest",
+                    "found_anchor",
+                    "history_limited",
+                )
+                if key in data and type(data[key]) is bool
+            }
+            return replace(
+                result,
+                data={
+                    "result": "success",
+                    "messages": visible,
+                    **metadata,
+                    "policy_page": {
+                        "first_id": ids[0] if ids else None,
+                        "last_id": ids[-1] if ids else None,
+                        "count": len(ids),
+                    },
+                },
+            )
         if operation_id in {
             "update-message",
             "delete-message",

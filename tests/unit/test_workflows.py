@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from thinkhome_zulip_mcp.channel_policy import ChannelPolicy
 from thinkhome_zulip_mcp.executor import OperationResult, Principal
 
 CALLER = Principal("alice", "https://zulip.example", "alice", "synthetic")
@@ -12,6 +13,7 @@ async def test_batch_reports_partial_success():
     from thinkhome_zulip_mcp.workflows import execute_batch
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     executor.execute.side_effect = [
         OperationResult("first", data={"id": 1}),
         OperationResult("second", error={"code": "timeout"}, uncertain_write=True),
@@ -44,6 +46,7 @@ async def test_invalid_batch_never_starts(operations):
     from thinkhome_zulip_mcp.workflows import execute_batch
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     result = await execute_batch(executor, lambda: CALLER, operations)
     assert result.error["code"] == "invalid_batch"
     executor.execute.assert_not_called()
@@ -64,6 +67,7 @@ async def test_batch_rechecks_identity_before_each_operation():
         return CALLER
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     executor.execute.return_value = OperationResult("first", data={})
     result = await execute_batch(
         executor, principal, [{"operation_id": "x", "arguments": {}}] * 3
@@ -86,6 +90,7 @@ async def test_history_cursor_does_not_skip_messages(direction, pages):
     from thinkhome_zulip_mcp.workflows import history_page
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     executor.execute.side_effect = [
         OperationResult(
             str(i),
@@ -135,6 +140,7 @@ async def test_history_rejects_invalid_or_nonprogressing_response(payload):
     from thinkhome_zulip_mcp.workflows import history_page
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     executor.execute.return_value = OperationResult("upstream", data=payload)
     result = await history_page(executor, CALLER, [], cursor=10)
     assert result.error["code"] == "invalid_history_response"
@@ -155,6 +161,7 @@ async def test_history_invalid_arguments_never_reach_upstream(kwargs):
     from thinkhome_zulip_mcp.workflows import history_page
 
     executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
     result = await history_page(executor, CALLER, [], **kwargs)
     assert result.error["code"] == "invalid_history_request"
     executor.execute.assert_not_called()

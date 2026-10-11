@@ -85,7 +85,7 @@ async def test_send_denies_blocked_or_invalid_metadata(metadata):
     "operation,arguments",
     [
         ("send-message", {"type": "direct", "to": [1], "content": "test"}),
-        ("get-messages", {"anchor": "newest", "num_before": 1, "num_after": 0}),
+        ("get-drafts", {}),
         ("register-queue", {}),
     ],
 )

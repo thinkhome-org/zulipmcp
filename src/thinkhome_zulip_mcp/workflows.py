@@ -111,7 +111,37 @@ async def history_page(
             valid = valid and all(
                 mid < cursor if older else mid > cursor for mid in ids
             )
-    if not valid or type(exhausted) is not bool or (not messages and not exhausted):
+    traversal = ids
+    if executor.channel_policy.active:
+        page = data.get("policy_page") if isinstance(data, dict) else None
+        if not isinstance(page, dict) or type(page.get("count")) is not int:
+            valid = False
+        else:
+            count, first, last = (
+                page["count"],
+                page.get("first_id"),
+                page.get("last_id"),
+            )
+            if count == 0:
+                valid = valid and not ids and first is None and last is None
+                traversal = []
+            elif (
+                not len(ids) <= count <= limit
+                or type(first) is not int
+                or type(last) is not int
+                or first < 1
+                or last < first
+                or (count == 1) != (first == last)
+            ):
+                valid = False
+            else:
+                traversal = [first, last]
+                valid = valid and all(first <= mid <= last for mid in ids)
+                if cursor is not None:
+                    valid = valid and all(
+                        mid < cursor if older else mid > cursor for mid in traversal
+                    )
+    if not valid or type(exhausted) is not bool or (not traversal and not exhausted):
         return OperationResult(
             result.request_id, error={"code": "invalid_history_response"}
         )
@@ -119,7 +149,9 @@ async def history_page(
         result.request_id,
         data={
             **data,
-            "next_cursor": (ids[0] if older else ids[-1]) if ids else cursor,
+            "next_cursor": (traversal[0] if older else traversal[-1])
+            if traversal
+            else cursor,
             "exhausted": exhausted,
             "direction": direction,
         },
