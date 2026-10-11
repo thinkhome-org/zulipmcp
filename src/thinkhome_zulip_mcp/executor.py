@@ -219,13 +219,25 @@ class Executor:
             )
             self._validate(schema, value)
             if parameter["in"] == "path":
-                segment = str(value)
-                decoded = segment
-                for _ in range(4):
-                    decoded = unquote(decoded)
-                if decoded in {".", ".."} or any(c in decoded for c in "/\\\x00"):
-                    raise ValueError("Unsafe path parameter")
-                path = path.replace("{" + name + "}", quote(segment, safe=""))
+                # These routes use <path:filename> in Zulip 12.3 zproject/urls.py.
+                is_file_path = (
+                    operation.operation_id
+                    in {"get-file-temporary-url", "check-thumbnail-status"}
+                    and name == "filename"
+                )
+                segments = str(value).split("/") if is_file_path else [str(value)]
+                for segment in segments:
+                    decoded = segment
+                    for _ in range(4):
+                        decoded = unquote(decoded)
+                    if (
+                        not decoded
+                        or decoded in {".", ".."}
+                        or any(c in decoded for c in "/\\\x00")
+                    ):
+                        raise ValueError("Unsafe path parameter")
+                encoded_path = "/".join(quote(part, safe="") for part in segments)
+                path = path.replace("{" + name + "}", encoded_path)
             elif parameter["in"] == "query":
                 query[name] = _wire_value(value, encoded)
             else:

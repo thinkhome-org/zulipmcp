@@ -133,8 +133,10 @@ actual Zulip integration remain pending; Task 4 is not complete.
 **Partial evidence:** internal FileStore and multipart executor cover owner binding,
 15-minute handle expiry, bounded streaming, local path/symlink checks and seven
 multipart schemas. Authenticated HTTP staging/retrieval/deletion, stdio local
-import and lifecycle cleanup are implemented. Downloads from Zulip via signed
-URLs remain pending; Task 5 is not complete.
+import and lifecycle cleanup are implemented. Signed-URL attachment downloads
+are implemented with caller authorization and bounded credential-free transfers.
+Live Zulip/storage verification and the remaining API audit are pending; Task 5
+is not complete.
 
 ## Úloha 6 — Události a praktické pracovní nástroje
 
@@ -147,6 +149,20 @@ URLs remain pending; Task 5 is not complete.
 - [ ] Přidat pohodlné nástroje pro fulltext, historii, zprávy, přesun/resolve tématu a soubory bez duplikace autorizace a validace.
 - [ ] Přidat batch s explicitními dílčími výsledky, žádný rollback nebo neověřená idempotence. Změny více uživatelů používají jen upstream dostupné operace a oprávnění volajícího.
 - [ ] Ověřit testy a ukázkové scénáře proti testovacímu Zulipu; commit `feat: add event handling and bounded workflows`; push a PR.
+
+## Úloha 6A — Povinná úplná parita se zulip/zulipmcp kromě Hermes
+
+**Doplněný požadavek uživatele:** výsledný projekt musí mít nejméně všechny funkce
+referenčního projektu, nejen stejné REST endpointy. Závazný inventář a připnuté SHA
+jsou v [zulipmcp-parity.md](../../zulipmcp-parity.md). Hermes je jediná výjimka.
+
+- [ ] Doplnit všech 27 MCP nástrojů a jejich chování včetně context/reply/listen/end_session, formátování, viditelnosti, allowlistů, normalizace a souborových wrapperů.
+- [ ] Dodat caller-scoped Python knihovnu pokrývající všechny veřejné schopnosti referenční knihovny, konfiguraci a hooky.
+- [ ] Dodat autentizovaný legacy SSE transport vedle stdio a Streamable HTTP.
+- [ ] Dodat explicitní direct-launch CLI pro Claude/Codex a mention listener pro Claude/Codex/OpenCode, překlady MCP konfigurace, životní cyklus a všechny doložené volby.
+- [ ] Zachovat omezené jednotlivé event polly (25 s), přidat obnovitelné dlouhé čekání s keepalive/cancel pro referenční listen workflow; žádné sdílení stavů mezi identitami.
+- [ ] Pro každý řádek inventáře doložit implementaci a regresní/integrační test; ověřit také scénáře z upstream testů. Zvlášť označit skutečné provider testy versus testy příkazů.
+- [ ] Aktualizovat dokumentaci, kompatibilitu, provenance/notice při případném převzetí kódu, push a draft PR po ucelených částech.
 
 ## Úloha 7 — Integrační kompatibilita a bezpečnostní review
 
@@ -186,6 +202,7 @@ Při nedostupnosti required checku se PR nemerguje s tvrzením, že je ověřen�
 
 ## Podmínky pro v1.0
 
+- [ ] Úplná funkční parita s připnutým `zulip/zulipmcp` kromě Hermes podle `docs/zulipmcp-parity.md`, doložená po jednotlivých funkcích.
 - [ ] Kompletní audit produkčních aplikačních rout a parametrů cílového Zulipu, veřejných i nedokumentovaných, bez nevysvětlených mezer.
 - [ ] Všechny in-scope operace implementované; 100 % položek má serializační/kontrakt test. Coverage není jen řádkové procento Pythonu.
 - [ ] Integračně ověřené autentizační a transportní cesty, izolace identit, hlavní CRUD/lifecycle a všechny vlastní nedokumentované adaptéry.

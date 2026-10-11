@@ -37,7 +37,8 @@ returned to the client without retrying earlier. Writes are never retried.
 
 Multipart uploads support staged handles through authenticated HTTP routes or
 stdio allowed-root import; see [file transfers](docs/file-transfers.md).
-Downloading existing Zulip attachments and alternative authentication remain pending.
+Existing attachments can be downloaded into owned handles; external storage
+redirects require configured HTTPS origins. Alternative authentication remains pending.
 No live Zulip or production operation has been verified; protocol tests use
 disposable local HTTP and ASGI fixtures.
 
@@ -71,3 +72,10 @@ See [CONTRIBUTING](CONTRIBUTING.md), the
 Project code is licensed under [MIT](LICENSE). Bundled Zulip material retains its
 [Apache-2.0 license](src/thinkhome_zulip_mcp/data/ZULIP-LICENSE).
 Publication targets remain pending; no release is published.
+
+## Required reference parity
+
+The release target includes every non-Hermes feature of `zulip/zulipmcp` **plus**
+the complete audited Zulip application API. See the pinned
+[reference parity inventory](docs/zulipmcp-parity.md). This is a requirement and
+tracking document, not a claim that those features are already implemented.

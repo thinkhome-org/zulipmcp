@@ -31,6 +31,7 @@ async def test_stdio_initialize_list_and_catalog_call(tmp_path):
                     "zulip_describe_operation",
                     "zulip_execute",
                     "zulip_capabilities",
+                    "zulip_download_file",
                 }
                 search = await session.call_tool(
                     "zulip_search_operations", {"query": "send-message"}

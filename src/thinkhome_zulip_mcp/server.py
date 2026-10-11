@@ -24,6 +24,7 @@ from starlette.routing import Route
 
 from thinkhome_zulip_mcp.auth import Authenticator
 from thinkhome_zulip_mcp.catalog import resolve_reference
+from thinkhome_zulip_mcp.downloads import download_file
 from thinkhome_zulip_mcp.executor import Executor, Principal
 from thinkhome_zulip_mcp.file_http import file_routes
 from thinkhome_zulip_mcp.files import FileStore
@@ -54,6 +55,7 @@ def create_server(
     executor: Executor | None = None,
     *,
     authenticator: Authenticator | None = None,
+    download_origins: tuple[str, ...] = (),
 ) -> MCPServer[Any]:
     if (principal is None) == (authenticator is None):
         raise ValueError("Configure either a stdio principal or HTTP authenticator")
@@ -123,6 +125,37 @@ def create_server(
             """Stage a relative file under the configured allowed root."""
             assert executor.files is not None
             return asdict(await executor.files.import_local(current_principal(), path))
+
+    if executor.files:
+
+        @server.tool(
+            annotations=ToolAnnotations(
+                read_only_hint=False, destructive_hint=False, open_world_hint=True
+            )
+        )
+        async def zulip_download_file(
+            realm_id_str: int, filename: str
+        ) -> CallToolResult:
+            """Stage an authorized Zulip attachment using its realm ID and path."""
+            result = await download_file(
+                executor,
+                current_principal(),
+                realm_id_str,
+                filename,
+                allowed_origins=download_origins,
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text="Download failed."
+                        if result.error
+                        else "Attachment staged.",
+                    )
+                ],
+                structured_content=asdict(result),
+                is_error=result.error is not None,
+            )
 
     @server.tool(annotations=local_read)
     def zulip_search_operations(
@@ -227,6 +260,8 @@ def create_server(
             "catalog_operations": len(executor.catalog),
             "max_response_bytes": executor.max_response_bytes,
             "file_transfer": {
+                "zulip_download": True,
+                "download_origins": list(download_origins),
                 "max_bytes": executor.files.max_bytes,
                 "max_total_bytes": executor.files.max_total_bytes,
                 "max_handles": executor.files.max_files,
@@ -244,7 +279,7 @@ def create_server(
             else None,
             "limitations": [
                 "API source audit incomplete",
-                "Downloading files from Zulip is pending",
+                "Live Zulip file acceptance remains unverified",
                 "Alternate authentication adapters pending",
                 "Per-operation wire and live integration coverage incomplete",
             ],
@@ -254,12 +289,19 @@ def create_server(
 
 
 def create_http_app(
-    authenticator: Authenticator, executor: Executor | None = None
+    authenticator: Authenticator,
+    executor: Executor | None = None,
+    *,
+    download_origins: tuple[str, ...] = (),
 ) -> Starlette:
     executor = executor or Executor()
     if executor.files is None:
         executor.files = FileStore()
-    server = create_server(executor=executor, authenticator=authenticator)
+    server = create_server(
+        executor=executor,
+        authenticator=authenticator,
+        download_origins=download_origins,
+    )
     resource = urlsplit(authenticator.config.resource_url)
     security = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
