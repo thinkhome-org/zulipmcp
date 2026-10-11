@@ -74,6 +74,8 @@ uv build
 See [CONTRIBUTING](CONTRIBUTING.md), the
 [design](docs/superpowers/specs/2026-10-11-thinkhome-zulip-mcp-design.md), and the
 [implementation plan](docs/superpowers/plans/2026-10-11-thinkhome-zulip-mcp.md).
+Security scans, their exact exceptions and upstream change reports are described
+in [security checks](docs/security-checks.md).
 
 Original project code is licensed under [MIT](LICENSE). Bundled Zulip material
 and adapted windborne Markdown helpers retain Apache-2.0; see
