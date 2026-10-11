@@ -51,10 +51,58 @@ provider side effect. Tests assert policy denials before network access, allowed
 history reads, strict configuration parsing, batch enforcement and authenticated
 HTTP discovery/execution. Real Zulip integration coverage remains pending.
 
+## Channel policy implementation in progress
+
+The executor now loads Johnny Decimal settings (`ZULIPCHAT_CHANNEL_FILTER_ENABLED`,
+`ZULIPCHAT_JD_ALLOW_AREAS`, `ZULIPCHAT_JD_DENY_AREAS`,
+`ZULIPCHAT_CHANNEL_INCLUDE`, `ZULIPCHAT_CHANNEL_EXCLUDE`,
+`ZULIPCHAT_EXCLUDE_NON_JD`, `ZULIPCHAT_EXCLUDE_DMS`,
+`ZULIPCHAT_EXCLUDE_PRIVATE`) and optional `BOT_ALLOWED_PRIVATE_STREAMS` /
+`BOT_ALLOWED_WRITE_STREAMS` allowlists. Invalid booleans, ranges or JSON fail startup.
+All filters are inactive by default. An explicitly empty private allowlist denies
+private channels; an unset allowlist leaves ordinary API permissions unchanged.
+The windborne compatibility profile's default-private-denial remains pending.
+
+### Guarded operations
+
+| Operations | Enforcement |
+|---|---|
+| `send-message` | Resolve and validate channel metadata, enforce read/write rules, send to the checked numeric ID; apply DM restriction for direct messages. |
+| `get-streams` | Validate each channel and filter the list under the current caller. |
+| `get-stream-id`, `get-stream-by-id` | Check current channel name/privacy before returning metadata or ID. |
+| `get-message` | Validate exact message ID, check current channel metadata or the DM rule before returning content. |
+| `update-message`, `delete-message`, `add-reaction`, `remove-reaction` | Validate input, check source-message access and source-channel write rules; moves also check the destination. Read-only denials precede metadata requests. |
+| `get-stream-topics`, `get-subscribers`, `get-subscription-status` | Check channel metadata before fetching the requested data. |
+
+While a channel policy is active, all other operations return
+`channel_policy_not_supported` without making an upstream call. This temporary
+restriction prevents unguarded generic endpoints from bypassing the rules;
+it is not complete reference parity. Single-message checks do not trust a
+message's display name as evidence of privacy. Listings reject malformed results
+and strip unfiltered data from upstream errors.
+
+### Rule precedence
+
+JD settings preserve the reference ordering: private exclusion and an excluded
+name win; an included name then overrides JD area restrictions; otherwise a denied
+area wins over the area allowlist. Non-JD names follow `EXCLUDE_NON_JD`. JD named
+lists are case-sensitive. Private/write allowlists match lowercased names and are
+additional constraints that a JD include cannot bypass. Allowlist syntax accepts
+comma-separated names, a JSON string or a JSON string array; `__ALL__` removes
+that allowlist restriction. An explicitly empty JSON write array denies channel
+writes, while an empty/unset write string retains the reference's allow-all default.
+
+
+Channel sends resolve names to IDs, fetch current channel metadata under the
+same caller credentials, validate metadata and permissions, then send using the
+checked numeric ID. Missing or denied metadata returns `channel_policy_denied`.
+There is no shared metadata cache. A concurrent privacy/name change between check
+and write cannot be made atomic by this MCP; Zulip's own permissions remain the
+final authority. DMs follow the configured DM restriction.
+
 ## Remaining work
 
 The complete endpoint source audit is still in progress. New endpoint additions
 must be reviewed for side effects, including GET endpoints; an HTTP method alone
-is insufficient evidence. Private/write channel allowlists, Johnny Decimal
-filters, denied-channel response filtering and configurable agent/admin policies
-are not yet implemented. This page does not claim full reference-policy parity.
+is insufficient evidence. Channel policies still need guards for reads and other mutations, response
+filtering, batch/event/history bypass tests and configurable agent/admin policies. This page does not claim full reference-policy parity.

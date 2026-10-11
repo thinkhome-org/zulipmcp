@@ -7,7 +7,7 @@ import os
 from collections.abc import Awaitable, Callable
 from contextlib import ExitStack
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -24,6 +24,7 @@ from thinkhome_zulip_mcp.catalog import (
     load_document,
     resolve_reference,
 )
+from thinkhome_zulip_mcp.channel_policy import ChannelPolicy
 from thinkhome_zulip_mcp.files import FileAccessError, FileStore
 
 
@@ -142,6 +143,7 @@ class Executor:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         files: FileStore | None = None,
         read_only: bool | None = None,
+        channel_policy: ChannelPolicy | None = None,
     ) -> None:
         if read_only is None:
             setting = os.environ.get("ZULIPCHAT_READ_ONLY", "false").lower()
@@ -149,6 +151,9 @@ class Executor:
                 raise ValueError("ZULIPCHAT_READ_ONLY must be true, false, 1 or 0")
             read_only = setting in {"true", "1"}
         self.read_only = read_only
+        self.channel_policy = channel_policy or ChannelPolicy.from_environment(
+            os.environ
+        )
         if max_response_bytes <= 0:
             raise ValueError("Response limit must be positive")
         self.document = load_document()
@@ -283,6 +288,187 @@ class Executor:
         return path, query, form, json_body, authenticated, file_handles
 
     async def execute(
+        self, principal: Principal, operation_id: str, arguments: dict[str, Any]
+    ) -> OperationResult:
+        if not self.channel_policy.active:
+            return await self._execute(principal, operation_id, arguments)
+        if operation_id in {
+            "update-message",
+            "delete-message",
+            "add-reaction",
+            "remove-reaction",
+        }:
+            if self.read_only:
+                return await self._execute(principal, operation_id, arguments)
+            try:
+                self._prepare(self.catalog[operation_id], arguments)
+            except (ValueError, TypeError) as exc:
+                return OperationResult(
+                    str(uuid4()),
+                    error={"code": "invalid_arguments", "message": str(exc)},
+                )
+            source = await self.execute(
+                principal, "get-message", {"message_id": arguments["message_id"]}
+            )
+            if source.error:
+                return source
+            message = source.data["message"]
+            stream_ids = set()
+            if message["type"] == "stream":
+                stream_ids.add(message["stream_id"])
+            if "stream_id" in arguments:
+                stream_ids.add(arguments["stream_id"])
+            for stream_id in stream_ids:
+                channel = await self.execute(
+                    principal, "get-stream-by-id", {"stream_id": stream_id}
+                )
+                if channel.error:
+                    return channel
+                stream = channel.data["stream"]
+                if not self.channel_policy.allows_channel(
+                    stream["name"], private=stream["invite_only"], write=True
+                ):
+                    return OperationResult(
+                        str(uuid4()), error={"code": "channel_policy_denied"}
+                    )
+            return await self._execute(principal, operation_id, arguments)
+        if operation_id == "get-message":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            message = (
+                result.data.get("message") if isinstance(result.data, dict) else None
+            )
+            if (
+                not isinstance(message, dict)
+                or type(message.get("id")) is not int
+                or message["id"] != arguments["message_id"]
+            ):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            allowed = False
+            if message.get("type") in {"private", "direct"}:
+                allowed = self.channel_policy.allows_dm()
+            elif message.get("type") == "stream":
+                stream_id = message.get("stream_id")
+                if type(stream_id) is int and stream_id > 0:
+                    channel = await self.execute(
+                        principal, "get-stream-by-id", {"stream_id": stream_id}
+                    )
+                    allowed = channel.error is None
+            if not allowed:
+                return replace(
+                    result, data=None, error={"code": "channel_policy_denied"}
+                )
+            return replace(result, data={"result": "success", "message": message})
+        if operation_id == "get-streams":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            streams = (
+                result.data.get("streams") if isinstance(result.data, dict) else None
+            )
+            if not isinstance(streams, list) or any(
+                not isinstance(stream, dict)
+                or type(stream.get("stream_id")) is not int
+                or stream["stream_id"] <= 0
+                or not isinstance(stream.get("name"), str)
+                or type(stream.get("invite_only")) is not bool
+                for stream in streams
+            ):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            return replace(
+                result,
+                data={
+                    "result": "success",
+                    "streams": [
+                        stream
+                        for stream in streams
+                        if self.channel_policy.allows_channel(
+                            stream["name"], private=stream["invite_only"]
+                        )
+                    ],
+                },
+            )
+        if operation_id not in {
+            "send-message",
+            "get-stream-id",
+            "get-stream-by-id",
+            "get-stream-topics",
+            "get-subscribers",
+            "get-subscription-status",
+        }:
+            # shortcut: deny other paths until their channel guards are implemented.
+            return OperationResult(
+                str(uuid4()), error={"code": "channel_policy_not_supported"}
+            )
+        if self.read_only and operation_id == "send-message":
+            return await self._execute(principal, operation_id, arguments)
+        try:
+            self._prepare(self.catalog[operation_id], arguments)
+        except (ValueError, TypeError) as exc:
+            return OperationResult(
+                str(uuid4()), error={"code": "invalid_arguments", "message": str(exc)}
+            )
+        denied = OperationResult(str(uuid4()), error={"code": "channel_policy_denied"})
+        if operation_id == "send-message" and arguments["type"] in {
+            "direct",
+            "private",
+        }:
+            if not self.channel_policy.allows_dm():
+                return denied
+            return await self._execute(principal, operation_id, arguments)
+        target = arguments[
+            "to"
+            if operation_id == "send-message"
+            else "stream"
+            if operation_id == "get-stream-id"
+            else "stream_id"
+        ]
+        if isinstance(target, list):
+            if len(target) != 1:
+                return denied
+            target = target[0]
+        if isinstance(target, str):
+            lookup = await self._execute(principal, "get-stream-id", {"stream": target})
+            if lookup.error or not isinstance(lookup.data, dict):
+                return denied
+            target = lookup.data.get("stream_id")
+        if type(target) is not int or target <= 0:
+            return denied
+        lookup = await self._execute(
+            principal, "get-stream-by-id", {"stream_id": target}
+        )
+        if lookup.error or not isinstance(lookup.data, dict):
+            return denied
+        stream = lookup.data.get("stream")
+        if (
+            not isinstance(stream, dict)
+            or type(stream.get("stream_id")) is not int
+            or stream["stream_id"] != target
+            or not isinstance(stream.get("name"), str)
+            or type(stream.get("invite_only")) is not bool
+        ):
+            return denied
+        if not self.channel_policy.allows_channel(
+            stream["name"],
+            private=stream["invite_only"],
+            write=operation_id == "send-message",
+        ):
+            return denied
+        if operation_id == "get-stream-id":
+            return replace(lookup, data={"result": "success", "stream_id": target})
+        if operation_id == "get-stream-by-id":
+            return replace(lookup, data={"result": "success", "stream": stream})
+        if operation_id != "send-message":
+            return await self._execute(principal, operation_id, arguments)
+        # Bind the send to the checked ID, even if a name is renamed/reassigned.
+        return await self._execute(principal, operation_id, {**arguments, "to": target})
+
+    async def _execute(
         self, principal: Principal, operation_id: str, arguments: dict[str, Any]
     ) -> OperationResult:
         request_id = str(uuid4())
