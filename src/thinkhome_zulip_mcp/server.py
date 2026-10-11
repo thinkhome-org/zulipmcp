@@ -114,7 +114,8 @@ def create_server(
                 "issuer_url": config.issuer or config.resource_url,
                 "resource_server_url": config.resource_url,
                 "required_scopes": ["zulip:access"],
-                "validate_token_resource": True,
+                # This is a boolean OAuth validation flag, not a credential.
+                "validate_token_resource": True,  # nosec B105
             }
         )
     executor = executor or Executor()
@@ -230,7 +231,8 @@ def create_server(
         )
         async def zulip_stage_file(path: str) -> dict[str, Any]:
             """Stage a relative file under the configured allowed root."""
-            assert executor.files is not None
+            # Registration above requires files; this assertion only narrows the type.
+            assert executor.files is not None  # nosec B101
             return asdict(await executor.files.import_local(current_principal(), path))
 
     if executor.files:

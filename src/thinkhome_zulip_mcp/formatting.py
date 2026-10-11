@@ -4,7 +4,9 @@ import re
 from collections import Counter
 from datetime import datetime
 from typing import Any
-from xml.etree.ElementTree import Element, tostring
+
+# This module emits escaped XML; it never parses caller XML.
+from xml.etree.ElementTree import Element, tostring  # nosec B405
 from zoneinfo import ZoneInfo
 
 _XML_INVALID = re.compile(
@@ -135,7 +137,8 @@ def format_topics(
     messages: list[dict[str, Any]], combine: bool = True, *, timezone: str = "UTC"
 ) -> str:
     """Group channel history by immutable channel ID and case-insensitive topic."""
-    from xml.etree.ElementTree import fromstring
+    # The parser receives only our own escaped formatter output.
+    from xml.etree.ElementTree import fromstring  # nosec B405
 
     groups: dict[tuple[int, str], list[dict[str, Any]]] = {}
     for message in messages:
@@ -163,7 +166,8 @@ def format_topics(
                 "topic": group[0]["subject"],
             },
         )
-        section.extend(fromstring("<root>" + body + "</root>"))
+        # Only format_messages output enters the parser; message XML is escaped text.
+        section.extend(fromstring("<root>" + body + "</root>"))  # nosec B314
         output.append(tostring(section, encoding="unicode"))
     return "\n".join(output)
 
