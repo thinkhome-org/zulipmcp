@@ -13,8 +13,10 @@ select the license for our own implementation.
 - 158 upstream schema operations after three documentation-only exclusions, plus
   29 source-reviewed additions, including the full core REST gap and public
   subdomain availability.
-- 0 executable operations, 0 wire-contract-tested operations, 0 integration-tested
-  operations. Catalog tests verify schema retention and duplicate/missing ID checks.
+- Generic JSON/form execution is available. Wire tests cover selected operations;
+  all-operation wire coverage and live Zulip integration coverage remain incomplete.
+  Catalog implementation statuses are still provisional and must not be read as
+  certification of the generic executor for every operation.
 - The three documentation-only paths are listed in `data/exclusions.json`, with
   evidence from upstream `zerver/tests/test_openapi.py:241-249`.
 - 187 is **not** a claim about total application API coverage. The schema includes
@@ -100,6 +102,30 @@ Important distinctions retained in schemas and metadata:
 
 Still pending: non-core/included routes (SCIM, optional components, files and
 session-specific routes), runtime/dynamic route expansion, global wrapper inputs,
-response schemas, all execution and integration checks. Generated route records
+response schemas and complete per-operation execution/integration certification. Generated route records
 remain `pending` until their complete final classification is recorded. Do not
 interpret source-reviewed input metadata as a completed route audit.
+
+## Executor evidence (development)
+
+The stdio process has passed MCP initialize/list/call tests and a complete
+`zulip_execute` send-message call against a local disposable HTTP fixture. It is
+not a live Zulip integration test. HTTPX boundary tests cover form/query encoding,
+unknown fields, alias conflicts, authentication/cookie isolation, path traversal,
+redirects, response bounds, strict JSON numbers, timeout uncertainty and bounded
+safe-read retries. These tests do not certify the other catalog entries.
+
+Multipart execution now accepts staged owner-bound handles for all seven upload
+schemas (attachment, emoji, own avatar, realm icon/logo, bot create/update).
+Contract tests verify method/path, representative encoded fields and exact file
+bytes. These are HTTPX boundary checks, not complete parameter or live-handler
+certification. Authenticated HTTP staging/retrieval/deletion, stdio allowed-root import and
+server lifecycle cleanup are implemented. Signed-URL attachment downloads use
+caller authorization, credential-free bounded transfer and configured storage
+origins. The temporary-URL operation now accepts audited nested filename paths.
+These behaviors are fixture-tested; live Zulip/storage acceptance is pending.
+
+Other pending adapters include cookie/session authentication,
+credentials-retrieval flows and server-to-server endpoints. Authenticated
+multi-user HTTP and the real Keycloak PKCE/network fixture are implemented;
+actual Zulip integration is still missing. The complete release gate remains false.
