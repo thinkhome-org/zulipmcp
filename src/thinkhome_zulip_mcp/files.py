@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import mimetypes
 import os
 import secrets
@@ -19,6 +20,10 @@ if TYPE_CHECKING:
 
 
 class FileAccessError(ValueError):
+    pass
+
+
+class FileLimitError(FileAccessError):
     pass
 
 
@@ -108,7 +113,7 @@ class FileStore:
             raise FileAccessError("Invalid content type")
         self.expire()
         if len(self._entries) + self._pending_files >= self.max_files:
-            raise FileAccessError("File handle limit exceeded")
+            raise FileLimitError("File handle limit exceeded")
         self._pending_files += 1
         reserved = 0
         handle = secrets.token_urlsafe(32)
@@ -123,10 +128,10 @@ class FileStore:
                         raise FileAccessError("File store is closed")
                     size += len(chunk)
                     if size > self.max_bytes:
-                        raise FileAccessError("File size limit exceeded")
+                        raise FileLimitError("File size limit exceeded")
                     stored = sum(entry.info.size for entry in self._entries.values())
                     if stored + self._pending_bytes + len(chunk) > self.max_total_bytes:
-                        raise FileAccessError("File storage limit exceeded")
+                        raise FileLimitError("File storage limit exceeded")
                     self._pending_bytes += len(chunk)
                     reserved += len(chunk)
                     output.write(chunk)
@@ -142,14 +147,28 @@ class FileStore:
             if not complete:
                 path.unlink(missing_ok=True)
 
-    @contextmanager
-    def open(
-        self, principal: Principal, handle: str
-    ) -> Iterator[tuple[FileInfo, BinaryIO]]:
+    async def cleanup_loop(self) -> None:
+        while True:
+            await asyncio.sleep(30)
+            self.expire()
+
+    def _entry(self, principal: Principal, handle: str) -> _Entry:
         self.expire()
         entry = self._entries.get(handle)
         if self._closed or entry is None or entry.owner != self._owner(principal):
             raise FileAccessError("File handle unavailable")
+        return entry
+
+    def remove(self, principal: Principal, handle: str) -> None:
+        entry = self._entry(principal, handle)
+        entry.path.unlink(missing_ok=True)
+        del self._entries[handle]
+
+    @contextmanager
+    def open(
+        self, principal: Principal, handle: str
+    ) -> Iterator[tuple[FileInfo, BinaryIO]]:
+        entry = self._entry(principal, handle)
         with entry.path.open("rb") as source:
             yield entry.info, source
 
@@ -199,3 +218,14 @@ class FileStore:
                 return await self.stage(principal, parts[-1], content_type, chunks())
         finally:
             os.close(directory_fd)
+
+
+def file_store_from_environment(allowed_root: Path | None = None) -> FileStore:
+    return FileStore(
+        allowed_root=allowed_root,
+        max_bytes=int(os.environ.get("MCP_FILE_MAX_BYTES", 25 * 1024 * 1024)),
+        max_total_bytes=int(
+            os.environ.get("MCP_FILE_MAX_TOTAL_BYTES", 100 * 1024 * 1024)
+        ),
+        max_files=int(os.environ.get("MCP_FILE_MAX_HANDLES", 100)),
+    )
