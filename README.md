@@ -75,7 +75,13 @@ Publication targets remain pending; no release is published.
 
 ## Required reference parity
 
-The release target includes every non-Hermes feature of `zulip/zulipmcp` **plus**
+The release target includes every non-Hermes feature of `windborne/zulipmcp`,
+`unfoldingWord/uw-zulip-mcp` and `akougkas/zulipchat-mcp` **plus**
 the complete audited Zulip application API. See the pinned
-[reference parity inventory](docs/zulipmcp-parity.md). This is a requirement and
+[windborne inventory](docs/zulipmcp-parity.md) and
+[additional reference inventory](docs/additional-mcp-parity.md). This is a requirement and
 tracking document, not a claim that those features are already implemented.
+
+Managed event registration, bounded polling and deletion are documented in
+[event queues](docs/events.md). Full reference listening/session behavior remains
+in progress.

@@ -25,10 +25,26 @@ from starlette.routing import Route
 from thinkhome_zulip_mcp.auth import Authenticator
 from thinkhome_zulip_mcp.catalog import resolve_reference
 from thinkhome_zulip_mcp.downloads import download_file
-from thinkhome_zulip_mcp.executor import Executor, Principal
+from thinkhome_zulip_mcp.events import EventQueues
+from thinkhome_zulip_mcp.executor import Executor, OperationResult, Principal
 from thinkhome_zulip_mcp.file_http import file_routes
 from thinkhome_zulip_mcp.files import FileStore
 from thinkhome_zulip_mcp.store import AuthenticationError
+
+
+def _tool_result(result: OperationResult, success: str) -> CallToolResult:
+    return CallToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text="Operation failed; inspect structured error and uncertain_write."
+                if result.error
+                else success,
+            )
+        ],
+        structured_content=asdict(result),
+        is_error=result.error is not None,
+    )
 
 
 def principal_from_environment() -> Principal:
@@ -80,6 +96,7 @@ def create_server(
             }
         )
     executor = executor or Executor()
+    queues = EventQueues(executor)
 
     @asynccontextmanager
     async def lifespan(_: MCPServer[Any]) -> AsyncIterator[dict[str, Any]]:
@@ -88,12 +105,17 @@ def create_server(
         try:
             yield {}
         finally:
-            if task:
-                task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await task
-            if files:
-                files.close()
+            try:
+                if task:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await task
+            finally:
+                try:
+                    await queues.close()
+                finally:
+                    if files:
+                        files.close()
 
     server: MCPServer[Any] = MCPServer(
         "ThinkHome Zulip MCP",
@@ -144,18 +166,7 @@ def create_server(
                 filename,
                 allowed_origins=download_origins,
             )
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="Download failed."
-                        if result.error
-                        else "Attachment staged.",
-                    )
-                ],
-                structured_content=asdict(result),
-                is_error=result.error is not None,
-            )
+            return _tool_result(result, "Attachment staged.")
 
     @server.tool(annotations=local_read)
     def zulip_search_operations(
@@ -238,15 +249,41 @@ def create_server(
     ) -> CallToolResult:
         """Execute as the configured caller. Writes may be destructive."""
         result = await executor.execute(current_principal(), operation_id, arguments)
-        message = (
-            "Operation failed; inspect structured error and uncertain_write."
-            if result.error
-            else "Zulip response received."
+        return _tool_result(result, "Zulip response received.")
+
+    queue_annotations = ToolAnnotations(
+        read_only_hint=False, destructive_hint=False, open_world_hint=True
+    )
+
+    @server.tool(annotations=queue_annotations)
+    async def zulip_register_events(arguments: dict[str, Any]) -> CallToolResult:
+        """Register a caller-owned queue using register-queue catalog arguments."""
+        return _tool_result(
+            await queues.register(current_principal(), arguments),
+            "Event queue registered.",
         )
-        return CallToolResult(
-            content=[TextContent(type="text", text=message)],
-            structured_content=asdict(result),
-            is_error=result.error is not None,
+
+    @server.tool(annotations=queue_annotations)
+    async def zulip_poll_events(
+        handle: Annotated[str, Field(min_length=1, max_length=128)],
+        last_event_id: Annotated[int, Field(ge=-1)],
+        wait_seconds: Annotated[float, Field(ge=0, le=25)] = 25,
+    ) -> CallToolResult:
+        """Acknowledge the cursor and get new events; zero wait is nonblocking."""
+        return _tool_result(
+            await queues.poll(
+                current_principal(), handle, last_event_id, wait_seconds=wait_seconds
+            ),
+            "Event poll completed; inspect timed_out and resync_required.",
+        )
+
+    @server.tool(annotations=queue_annotations)
+    async def zulip_delete_events(
+        handle: Annotated[str, Field(min_length=1, max_length=128)],
+    ) -> CallToolResult:
+        """Cancel a pending poll and delete this caller's event queue."""
+        return _tool_result(
+            await queues.delete(current_principal(), handle), "Event queue deleted."
         )
 
     @server.tool(annotations=local_read)
@@ -259,6 +296,11 @@ def create_server(
             "full_coverage": False,
             "catalog_operations": len(executor.catalog),
             "max_response_bytes": executor.max_response_bytes,
+            "event_queues": {
+                "max_queues": queues.max_queues,
+                "max_wait_seconds": 25,
+                "explicit_acknowledgement": True,
+            },
             "file_transfer": {
                 "zulip_download": True,
                 "download_origins": list(download_origins),
