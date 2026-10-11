@@ -106,7 +106,7 @@ final authority. DMs follow the configured DM restriction.
 The complete endpoint source audit is still in progress. New endpoint additions
 must be reviewed for side effects, including GET endpoints; an HTTP method alone
 is insufficient evidence. Channel policies still need guards for reads and other mutations, response
-filtering, batch/event/history bypass tests and configurable agent/admin policies. This page does not claim full reference-policy parity.
+filtering, event bypass tests and configurable agent/admin policies. This page does not claim full reference-policy parity.
 
 ## Filtered history pagination
 
@@ -125,3 +125,12 @@ without content or a new cursor, so transient failures cannot silently skip data
 
 Concurrent changes to channel metadata or messages remain possible between calls;
 this is not a consistent snapshot. Event filtering remains pending.
+
+## Authenticated HTTP verification
+
+The HTTP policy integration test initializes separate MCP sessions for two
+provisioned callers. It checks generic and dedicated send denial, a batch that
+stops after its first denied operation, per-caller history filtering and rejection
+of currently unsupported event registration without upstream access. This uses
+real MCP/ASGI authentication with a simulated Zulip transport; it is not live
+Zulip verification or exhaustive coverage of all tool/endpoint combinations.
