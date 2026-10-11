@@ -4,6 +4,7 @@ import asyncio
 import json
 import math
 from collections.abc import Awaitable, Callable
+from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ from thinkhome_zulip_mcp.catalog import (
     load_document,
     resolve_reference,
 )
+from thinkhome_zulip_mcp.files import FileAccessError, FileStore
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,7 @@ class Executor:
         transport: httpx.AsyncBaseTransport | None = None,
         max_response_bytes: int = 8 * 1024 * 1024,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        files: FileStore | None = None,
     ) -> None:
         if max_response_bytes <= 0:
             raise ValueError("Response limit must be positive")
@@ -147,6 +150,7 @@ class Executor:
             name: _normalize_schema(schema)
             for name, schema in self.components["schemas"].items()
         }
+        self.files = files
         self.sleep = sleep
         self.transport = transport
         self.max_response_bytes = max_response_bytes
@@ -161,7 +165,7 @@ class Executor:
 
     def _prepare(
         self, operation: Operation, arguments: dict[str, Any]
-    ) -> tuple[str, dict[str, str], dict[str, str], Any, bool]:
+    ) -> tuple[str, dict[str, str], dict[str, str], Any, bool, dict[str, str]]:
         json.dumps(arguments, allow_nan=False)
         definition = operation.definition
         path = operation.path
@@ -171,12 +175,22 @@ class Executor:
             parameters[(parameter["in"], parameter["name"])] = parameter
         body = resolve_reference(self.document, definition.get("requestBody", {}))
         content_types = body.get("content", {})
+        multipart = content_types.get("multipart/form-data", {})
+        multipart_properties = resolve_reference(
+            self.document, multipart.get("schema", {})
+        ).get("properties", {})
+        binary_fields = {
+            name
+            for name, schema in multipart_properties.items()
+            if resolve_reference(self.document, schema).get("format") == "binary"
+        }
+        prefer_multipart = bool(binary_fields & arguments.keys())
+        media_order = ["application/x-www-form-urlencoded", "application/json"]
+        media_order.insert(
+            0 if prefer_multipart else len(media_order), "multipart/form-data"
+        )
         media = next(
-            (
-                m
-                for m in ["application/x-www-form-urlencoded", "application/json"]
-                if m in content_types
-            ),
+            (m for m in media_order if m in content_types),
             None,
         )
         if content_types and media is None:
@@ -220,9 +234,18 @@ class Executor:
             raise ValueError("Missing path parameter")
         values = {key: value for key, value in arguments.items() if key in properties}
         form = {}
+        file_handles = {}
         json_body = None
         if content:
             self._validate(body_schema, values)
+            if media == "multipart/form-data":
+                if self.files is None:
+                    raise NotImplementedError("File staging is not configured")
+                file_handles = {
+                    name: values.pop(name) for name in binary_fields if name in values
+                }
+                if not file_handles:
+                    raise ValueError("At least one staged file is required")
             if media == "application/json":
                 json_body = values
             else:
@@ -237,7 +260,7 @@ class Executor:
         authenticated = (
             definition.get("security", self.document.get("security", [])) != []
         )
-        return path, query, form, json_body, authenticated
+        return path, query, form, json_body, authenticated, file_handles
 
     async def execute(
         self, principal: Principal, operation_id: str, arguments: dict[str, Any]
@@ -254,7 +277,7 @@ class Executor:
                 request_id, error={"code": "requires_separate_authentication_adapter"}
             )
         try:
-            path, query, form, json_body, authenticated = self._prepare(
+            path, query, form, json_body, authenticated, file_handles = self._prepare(
                 operation, arguments
             )
         except (ValueError, TypeError) as exc:
@@ -276,6 +299,7 @@ class Executor:
                 form,
                 json_body,
                 authenticated,
+                file_handles,
             )
             retryable = result.status_code in {429, 502, 503, 504} or (
                 result.error is not None
@@ -308,6 +332,7 @@ class Executor:
         form: dict[str, str],
         json_body: Any,
         authenticated: bool,
+        file_handles: dict[str, str],
     ) -> OperationResult:
         url = principal.realm_url.rstrip("/") + "/api/v1" + path
         is_write = (
@@ -315,71 +340,87 @@ class Executor:
             or operation.definition.get("x-thinkhome", {}).get("safe_read") is False
         )
         try:
-            # A client belongs to one call; cookies never cross principals.
-            async with httpx.AsyncClient(
-                transport=self.transport,
-                follow_redirects=False,
-                timeout=httpx.Timeout(30),
-                trust_env=False,
-            ) as client:
-                async with client.stream(
-                    operation.method,
-                    url,
-                    params=query,
-                    data=form or None,
-                    json=json_body,
-                    auth=httpx.BasicAuth(principal.email, principal.api_key)
-                    if authenticated
-                    else None,
-                ) as response:
-                    if 300 <= response.status_code < 400:
-                        return OperationResult(
-                            request_id,
-                            data={"location": response.headers.get("location")},
-                            status_code=response.status_code,
-                        )
-                    body = bytearray()
-                    async for chunk in response.aiter_bytes(chunk_size=65536):
-                        if len(body) + len(chunk) > self.max_response_bytes:
+            with ExitStack() as stack:
+                uploads = {}
+                for field_name, handle in file_handles.items():
+                    if self.files is None:
+                        raise FileAccessError("File staging is not configured")
+                    info, stream = stack.enter_context(
+                        self.files.open(principal, handle)
+                    )
+                    uploads[field_name] = (info.filename, stream, info.content_type)
+                # A client belongs to one call; cookies never cross principals.
+                async with httpx.AsyncClient(
+                    transport=self.transport,
+                    follow_redirects=False,
+                    timeout=httpx.Timeout(30),
+                    trust_env=False,
+                ) as client:
+                    async with client.stream(
+                        operation.method,
+                        url,
+                        params=query,
+                        data=form or None,
+                        json=json_body,
+                        files=uploads or None,
+                        auth=httpx.BasicAuth(principal.email, principal.api_key)
+                        if authenticated
+                        else None,
+                    ) as response:
+                        if 300 <= response.status_code < 400:
                             return OperationResult(
                                 request_id,
-                                error={"code": "response_too_large"},
+                                data={"location": response.headers.get("location")},
+                                status_code=response.status_code,
+                            )
+                        body = bytearray()
+                        async for chunk in response.aiter_bytes(chunk_size=65536):
+                            if len(body) + len(chunk) > self.max_response_bytes:
+                                return OperationResult(
+                                    request_id,
+                                    error={"code": "response_too_large"},
+                                    status_code=response.status_code,
+                                    retry_after=response.headers.get("retry-after"),
+                                    uncertain_write=is_write,
+                                )
+                            body.extend(chunk)
+                        try:
+                            data = (
+                                json.loads(
+                                    body,
+                                    parse_float=_finite_float,
+                                    parse_constant=_finite_float,
+                                )
+                                if body
+                                else None
+                            )
+                        except (ValueError, UnicodeError):
+                            return OperationResult(
+                                request_id,
+                                error={"code": "invalid_upstream_response"},
                                 status_code=response.status_code,
                                 retry_after=response.headers.get("retry-after"),
                                 uncertain_write=is_write,
                             )
-                        body.extend(chunk)
-                    try:
-                        data = (
-                            json.loads(
-                                body,
-                                parse_float=_finite_float,
-                                parse_constant=_finite_float,
-                            )
-                            if body
-                            else None
+                        failed = (
+                            response.is_error
+                            or isinstance(data, dict)
+                            and data.get("result") == "error"
                         )
-                    except (ValueError, UnicodeError):
                         return OperationResult(
                             request_id,
-                            error={"code": "invalid_upstream_response"},
+                            data=data,
+                            error={"code": "upstream_error"} if failed else None,
+                            uncertain_write=is_write and failed,
                             status_code=response.status_code,
                             retry_after=response.headers.get("retry-after"),
-                            uncertain_write=is_write,
                         )
-                    failed = (
-                        response.is_error
-                        or isinstance(data, dict)
-                        and data.get("result") == "error"
-                    )
-                    return OperationResult(
-                        request_id,
-                        data=data,
-                        error={"code": "upstream_error"} if failed else None,
-                        uncertain_write=is_write and failed,
-                        status_code=response.status_code,
-                        retry_after=response.headers.get("retry-after"),
-                    )
+        except FileAccessError:
+            return OperationResult(request_id, error={"code": "invalid_file_handle"})
+        except OSError:
+            return OperationResult(
+                request_id, error={"code": "file_io_error"}, uncertain_write=is_write
+            )
         except httpx.TransportError:
             return OperationResult(
                 request_id,

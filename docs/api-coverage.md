@@ -102,7 +102,7 @@ Important distinctions retained in schemas and metadata:
 
 Still pending: non-core/included routes (SCIM, optional components, files and
 session-specific routes), runtime/dynamic route expansion, global wrapper inputs,
-response schemas, all execution and integration checks. Generated route records
+response schemas and complete per-operation execution/integration certification. Generated route records
 remain `pending` until their complete final classification is recorded. Do not
 interpret source-reviewed input metadata as a completed route audit.
 
@@ -115,7 +115,14 @@ unknown fields, alias conflicts, authentication/cookie isolation, path traversal
 redirects, response bounds, strict JSON numbers, timeout uncertainty and bounded
 safe-read retries. These tests do not certify the other catalog entries.
 
-Runtime adapters still pending include multipart/binary transfers, cookie/session
-authentication, credentials-retrieval flows and server-to-server endpoints.
-The complete release gate remains false. The separate multi-user HTTP transport
-has not been implemented or exposed.
+Multipart execution now accepts staged owner-bound handles for all seven upload
+schemas (attachment, emoji, own avatar, realm icon/logo, bot create/update).
+Contract tests verify method/path, representative encoded fields and exact file
+bytes. These are HTTPX boundary checks, not complete parameter or live-handler
+certification. File staging is currently an internal API; MCP/HTTP staging and
+download endpoints and server lifecycle cleanup are still pending.
+
+Other pending adapters include binary downloads, cookie/session authentication,
+credentials-retrieval flows and server-to-server endpoints. Authenticated
+multi-user HTTP and the real Keycloak PKCE/network fixture are implemented;
+actual Zulip integration is still missing. The complete release gate remains false.

@@ -130,6 +130,11 @@ actual Zulip integration remain pending; Task 4 is not complete.
 - [ ] Ověřit kontrakt suite a znovu coverage kontrolu; nevydávat generickou HTTP funkci za otestované pokrytí všech operací.
 - [ ] Commit(y) podle ucelených oblastí, push a PR s aktualizací matice pokrytí.
 
+**Partial evidence:** internal FileStore and multipart executor cover owner binding,
+15-minute handle expiry, bounded streaming, local path/symlink checks and seven
+multipart schemas. Public staging/download endpoints and server lifecycle cleanup
+remain pending; Task 5 is not complete.
+
 ## Úloha 6 — Události a praktické pracovní nástroje
 
 **PR:** `codex/events-workflows`; `events.py`, `workflows.py`, odpovídající testy a příklady.
