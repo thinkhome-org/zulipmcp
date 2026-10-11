@@ -1,0 +1,19 @@
+{
+  "keycloak": {
+    "version": "26.8.0",
+    "url": "https://github.com/keycloak/keycloak/releases/download/26.8.0/keycloak-26.8.0.tar.gz",
+    "sha256": "9e41da899f838a58cd510fc98ed4f7cadc715aed5683e42aca20a0c9a2a3980a"
+  },
+  "java": {
+    "distribution": "Amazon Corretto",
+    "version": "25.0.4.10.1",
+    "linux-x64": {
+      "url": "https://corretto.aws/downloads/resources/25.0.4.10.1/amazon-corretto-25.0.4.10.1-linux-x64.tar.gz",
+      "sha256": "a45f1d385da8221fe1225dde5b6afa8e932a6acb93571b55eff4a39a2ebe7378"
+    },
+    "macos-aarch64": {
+      "url": "https://corretto.aws/downloads/resources/25.0.4.10.1/amazon-corretto-25.0.4.10.1-macosx-aarch64.tar.gz",
+      "sha256": "ee05ff1a6a459be34c4e504a206b0cae7c77e42c58424a08408b76c451bdd4ef"
+    }
+  }
+}
