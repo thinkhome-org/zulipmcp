@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -30,6 +30,7 @@ from thinkhome_zulip_mcp.executor import Executor, OperationResult, Principal
 from thinkhome_zulip_mcp.file_http import file_routes
 from thinkhome_zulip_mcp.files import FileStore
 from thinkhome_zulip_mcp.store import AuthenticationError
+from thinkhome_zulip_mcp.workflows import execute_batch, history_page
 
 
 def _tool_result(result: OperationResult, success: str) -> CallToolResult:
@@ -250,6 +251,43 @@ def create_server(
         """Execute as the configured caller. Writes may be destructive."""
         result = await executor.execute(current_principal(), operation_id, arguments)
         return _tool_result(result, "Zulip response received.")
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_batch(
+        operations: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=50)],
+    ) -> CallToolResult:
+        """Run until the first error; no rollback or additional write retries."""
+        return _tool_result(
+            await execute_batch(executor, current_principal, operations),
+            "Batch completed; inspect individual results.",
+        )
+
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_history(
+        narrow: list[Any],
+        cursor: Annotated[int | None, Field(ge=1)] = None,
+        direction: Literal["older", "newer"] = "older",
+        limit: Annotated[int, Field(ge=1, le=200)] = 100,
+    ) -> CallToolResult:
+        """Read one history page; reuse next_cursor with the same narrow/direction."""
+        return _tool_result(
+            await history_page(
+                executor,
+                current_principal(),
+                narrow,
+                cursor=cursor,
+                direction=direction,
+                limit=limit,
+            ),
+            "History page received; inspect exhausted and history_limited.",
+        )
 
     queue_annotations = ToolAnnotations(
         read_only_hint=False, destructive_hint=False, open_world_hint=True

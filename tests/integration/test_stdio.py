@@ -30,12 +30,25 @@ async def test_stdio_initialize_list_and_catalog_call(tmp_path):
                     "zulip_search_operations",
                     "zulip_describe_operation",
                     "zulip_execute",
+                    "zulip_batch",
+                    "zulip_history",
                     "zulip_capabilities",
                     "zulip_download_file",
                     "zulip_register_events",
                     "zulip_poll_events",
                     "zulip_delete_events",
                 }
+                batch = await session.call_tool(
+                    "zulip_batch",
+                    {
+                        "operations": [
+                            {"operation_id": "unknown", "arguments": {}},
+                            {"operation_id": "unknown", "arguments": {}},
+                        ]
+                    },
+                )
+                assert batch.is_error
+                assert batch.structured_content["data"]["not_attempted"] == [1]
                 search = await session.call_tool(
                     "zulip_search_operations", {"query": "send-message"}
                 )

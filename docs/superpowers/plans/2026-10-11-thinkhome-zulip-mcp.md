@@ -156,6 +156,13 @@ cancellation and bounded shutdown. Unit/SDK/HTTP fixture tests cover identity
 isolation and wire encoding. Reference listen/session behavior, workflows and live
 Zulip integration remain pending; Task 6 is not complete.
 
+**Additional partial evidence:** `zulip_batch` runs up to 50 catalog operations,
+refreshes caller access for each, stops on error and reports partial results.
+`zulip_history` reads one page up to 200 messages using exclusive ID cursors.
+Unit, executor-wire, stdio and authenticated HTTP fixtures cover pagination,
+identity selection and token revocation during a batch. Live Zulip workflow
+acceptance and the remaining convenience tools are still pending.
+
 ## Úloha 6A — Povinná úplná parita tří MCP referencí kromě Hermes
 
 **Doplněný požadavek uživatele:** výsledný projekt musí mít nejméně všechny funkce

@@ -83,5 +83,6 @@ the complete audited Zulip application API. See the pinned
 tracking document, not a claim that those features are already implemented.
 
 Managed event registration, bounded polling and deletion are documented in
-[event queues](docs/events.md). Full reference listening/session behavior remains
+[event queues](docs/events.md) and [bounded batch/history tools](docs/workflows.md).
+Full reference listening/session behavior remains
 in progress.
