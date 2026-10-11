@@ -19,10 +19,15 @@ Tento checklist původní rozsah nenahrazuje ani nezmenšuje.
 
 - [x] Dokončit již spuštěnou úplnou regresi kanálové větve; zaznamenat konečný výsledek, případné chyby opravit. Nerozbíhat duplicitní běh.
 - [x] Doplnit skutečnou test evidence do kanálové dokumentace a připraveného PR popisu.
-- [ ] Commit a push `codex/channel-management`, draft PR nad `codex/search-context`, připojit PR k chatu a zkontrolovat CI.
-- [ ] Selektivně zapojit připravenou opravu vazby identity v `search.py` a `multi_history.py`, přidat regresní testy a dokumentaci. Nekopírovat celé dočasné balíčky přes aktuální zdroj.
+- [x] Commit a push `codex/channel-management`, draft PR nad `codex/search-context`, připojit PR k chatu a zkontrolovat CI.
+- [x] Selektivně zapojit připravenou opravu vazby identity v `search.py` a `multi_history.py`, přidat regresní testy a dokumentaci. Nekopírovat celé dočasné balíčky přes aktuální zdroj.
 - [ ] Dokončit koncepty a plánované zprávy podle bodu 3; připravené opravy schémat zatím nejsou dokončená funkcionalita.
 - [ ] Sjednotit historické stavové odstavce plánu a návrhu se skutečností; zachovat historii a rozlišit původní návrh od později přijatých agentních integrací.
+
+Kanálový commit `265bb44`, [draft PR #24](https://github.com/thinkhome-org/zulipmcp/pull/24).
+CI spuštěno; úplný výsledek se eviduje po dokončení. Oprava search identity má 12 RED
+regresních případů a cílený běh 105 passed in 26.41s; Ruff, format a mypy prošly.
+Úplná regrese nové opravy a nezávislé review zůstávají otevřené; viz [izolace vyhledávání](search.md).
 
 Evidence prvních dvou kroků: `uv run pytest` — 786 passed in 871.57s;
 [kanálový audit](channel-api-audit.md#test-evidence-map), [dokumentace](channels.md).

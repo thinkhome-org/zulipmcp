@@ -148,3 +148,10 @@ messages. Formatted messages are displayed in ascending message-ID order;
 raw results retain the requested newest/oldest/relevance ordering. To retrieve
 and format a topic, supply `channel` and `topic` (including an empty topic) without
 a text query. Formatting does not change filters, result counts or cursors.
+
+Search, match checks, directory/topic discovery, advanced search and aggregate
+history compare the complete immutable Principal between dependent requests.
+Changing credentials or email on the same local identity discards accumulated
+results with `authentication_required`; no previous caller data is returned.
+Regression: `tests/unit/test_search_rebinding.py` (12 cases, observed failing
+before the fix). Mock tests verify local isolation, not live Zulip behavior.

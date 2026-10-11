@@ -254,11 +254,10 @@ async def search_messages(
         return OperationResult(request_id, error={"code": "invalid_search_request"})
     try:
         owner = current()
-        owner_key = (owner.identity_id, owner.realm_url.rstrip("/"))
 
         def principal() -> Principal:
             active = current()
-            if (active.identity_id, active.realm_url.rstrip("/")) != owner_key:
+            if active != owner:
                 raise AuthenticationError("Search owner changed")
             return active
 
@@ -423,10 +422,7 @@ async def check_matches(
             owner, "check-messages-match-narrow", {"msg_ids": ids, "narrow": narrow}
         )
         active = current()
-        if (owner.identity_id, owner.realm_url.rstrip("/")) != (
-            active.identity_id,
-            active.realm_url.rstrip("/"),
-        ):
+        if active != owner:
             raise AuthenticationError("Match reader changed")
         if result.error:
             return result
@@ -548,10 +544,7 @@ async def search_directory(
             owner, "get-users" if kind == "users" else "get-streams", {}
         )
         active = current()
-        if (owner.identity_id, owner.realm_url.rstrip("/")) != (
-            active.identity_id,
-            active.realm_url.rstrip("/"),
-        ):
+        if active != owner:
             raise AuthenticationError("Directory reader changed")
         if result.error:
             return result
@@ -631,11 +624,10 @@ async def search_topics(
         return OperationResult(request_id, error={"code": "invalid_topic_cursor"})
     try:
         owner = current()
-        owner_key = (owner.identity_id, owner.realm_url.rstrip("/"))
 
         def principal() -> Principal:
             active = current()
-            if (active.identity_id, active.realm_url.rstrip("/")) != owner_key:
+            if active != owner:
                 raise AuthenticationError("Topic reader changed")
             return active
 
@@ -770,11 +762,10 @@ async def advanced_search(
             return OperationResult(request_id, error={"code": "invalid_topic_cursor"})
     try:
         owner = current()
-        owner_key = (owner.identity_id, owner.realm_url.rstrip("/"))
 
         def principal() -> Principal:
             active = current()
-            if (active.identity_id, active.realm_url.rstrip("/")) != owner_key:
+            if active != owner:
                 raise AuthenticationError("Search reader changed")
             return active
 

@@ -75,11 +75,10 @@ async def multi_channel_history(
         )
     try:
         owner = current()
-        owner_key = (owner.identity_id, owner.realm_url.rstrip("/"))
 
         def principal() -> Principal:
             active = current()
-            if (active.identity_id, active.realm_url.rstrip("/")) != owner_key:
+            if active != owner:
                 raise AuthenticationError("History reader changed")
             return active
 
