@@ -58,7 +58,9 @@ RS256 access tokens with:
 - required `exp`, `iat`, nonempty `sub`, and `azp` (or `client_id`);
 - `scope` containing `zulip:access`; optional `nbf` must be valid.
 
-Provision each exact `(issuer, subject)` using `identity bind-oauth`. An unknown
+For Keycloak, retain the `basic` client scope or add its Subject mapper so access
+tokens include `sub`; an ID token containing `sub` does not prove the access token
+has it. Provision each exact `(issuer, subject)` using `identity bind-oauth`. An unknown
 subject has no access even if the token is otherwise valid. Email claims are not
 identity mappings. Protected-resource discovery advertises the external issuer;
 the OAuth provider supplies login, PKCE and its own discovery endpoints. This MCP
@@ -83,5 +85,6 @@ for plaintext Zulip must also be provisioned with `--allow-insecure-http`.
 Tests exercise signed JWT validation, malformed and oversized JWKS, origin checks,
 MCP initialize/tool calls, two concurrent identities, session theft, revocation,
 termination and log exclusion using an ASGI app and synthetic upstream responses.
-The Keycloak fixture, real network/client interoperability and actual Zulip
-integration are still pending. This is not a production-readiness claim.
+The [Keycloak 26.8 fixture](keycloak-testing.md) additionally exercises real PKCE
+and two official SDK clients over loopback sockets. Actual Zulip integration and
+production TLS/proxy validation remain pending. This is not a production-readiness claim.

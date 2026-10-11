@@ -44,7 +44,8 @@ disposable local HTTP and ASGI fixtures.
 Local administrator commands now manage encrypted identities, expiring manual
 MCP tokens and offline key rotation. See [provisioning and recovery](docs/identity-provisioning.md).
 Run `serve --transport http` with manual MCP tokens or external OAuth JWTs; see
-[HTTP configuration and limits](docs/http-auth.md). Real Keycloak validation is pending.
+[HTTP configuration and limits](docs/http-auth.md). The [Keycloak integration fixture](docs/keycloak-testing.md) exercises real PKCE
+and network MCP clients. Actual Zulip integration remains pending.
 
 ## Development
 

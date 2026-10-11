@@ -103,18 +103,19 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 **Rozhraní:** `authenticate(bearer: str) -> Principal`; CLI `identity add|update|remove`, `token issue|revoke`, `secrets rotate`. Každý autentizovaný request si načte platnou identitu; session ID samo neopravňuje k přístupu.
 
 - [ ] Napsat `test_two_users_never_share_credentials`, `test_revoked_token_is_rejected`, `test_wrong_issuer_audience_expiry_is_rejected`, `test_unknown_oauth_subject_has_no_zulip_access`, `test_secret_rotation_preserves_access`.
-- [ ] Implementovat SQLite s verzovanou migrací, šifrovanými Zulip secrets a hashovanými MCP tokeny. Šifrovací klíč je mimo DB; záloha a obnova DB+klíče se dokumentuje bez ukládání klíče do Git.
-- [ ] Přidat oddělené ruční tokeny a OAuth resource server přes ověřenou knihovnu/SDK; discovery a WWW-Authenticate podle připnuté podporované MCP specifikace.
-- [ ] Připravit konfiguraci externího Keycloak testovacího realm a protokolové testy validních/nevalidních access tokenů; žádný vlastní frontend a žádné spuštění prohlížeče.
+- [x] Implementovat SQLite s verzovanou migrací, šifrovanými Zulip secrets a hashovanými MCP tokeny. Šifrovací klíč je mimo DB; záloha a obnova DB+klíče se dokumentuje bez ukládání klíče do Git.
+- [x] Přidat oddělené ruční tokeny a OAuth resource server přes ověřenou knihovnu/SDK; discovery a WWW-Authenticate podle připnuté podporované MCP specifikace.
+- [x] Připravit konfiguraci externího Keycloak testovacího realm a protokolové testy validních/nevalidních access tokenů; žádný vlastní frontend a žádné spuštění prohlížeče.
 - [ ] Přidat adapter pro jinou autentizaci jen tam, kde ji doložil audit, včetně CSRF, expirace a shody identity u session credentials.
-- [ ] Ověřit souběžné HTTP klienty, ukončení session a odvolání tokenu během provozu. Popsat provisioning, rotaci a rozdíly identity/role.
+- [x] Ověřit souběžné HTTP klienty, ukončení session a odvolání tokenu během provozu. Popsat provisioning, rotaci a rozdíly identity/role.
 - [ ] Commit `feat: isolate users and authorize HTTP clients`; push a PR.
 
 **Partial evidence:** SQLite schema v1, Fernet-encrypted identities, expiring hashed
 manual tokens, exact OAuth mappings, offline atomic key rotation and provisioning
 CLI are implemented. HTTP request authentication, signed JWT validation and
-resource discovery now have synthetic protocol tests. Keycloak fixtures, live
-client interoperability and alternate upstream auth remain pending; Task 4 is not complete.
+resource discovery have synthetic protocol tests. A real Keycloak 26.8 fixture
+now covers PKCE and two official SDK network clients. Alternate upstream auth and
+actual Zulip integration remain pending; Task 4 is not complete.
 
 ## Úloha 5 — Binární operace a zbývající aplikační endpointy
 

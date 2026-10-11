@@ -33,6 +33,7 @@ dev = [
     "types-pyyaml>=6.0.12.20260906",
     "types-jsonschema>=4.26.0.20261006",
     "pytest-asyncio>=1.4.0",
+    "httpx2>=2.13.1",
 ]
 
 [tool.ruff]
