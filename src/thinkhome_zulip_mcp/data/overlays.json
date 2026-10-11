@@ -4340,6 +4340,33 @@
         "notes": "topic and deprecated subject are mutually exclusive.",
         "integration_status": "not-tested"
       }
+    },
+    {
+      "path": "/users/me/subscriptions",
+      "method": "post",
+      "media_type": "application/x-www-form-urlencoded",
+      "schema_path": [
+        "properties",
+        "subscriptions",
+        "items"
+      ],
+      "properties": {
+        "color": {
+          "type": "string",
+          "description": "Subscription color accepted by AddSubscriptionData; validated by Zulip check_color."
+        }
+      },
+      "aliases": {},
+      "encoding": {},
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/views/streams.py:554-565",
+          "zerver/views/streams.py:810-875"
+        ],
+        "notes": "Pinned OpenAPI omits subscription item color accepted by the handler. Nested unknown properties remain forbidden.",
+        "integration_status": "not-tested"
+      }
     }
   ]
 }

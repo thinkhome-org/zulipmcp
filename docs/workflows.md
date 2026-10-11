@@ -76,3 +76,12 @@ before and after normalization. Set a positive integer before server startup;
 invalid values reject startup. The limit is reported by `zulip_capabilities`.
 Zulip still enforces its own limits. Configured channel policies remain pending. These tools never accept credentials, origin or sender overrides;
 advanced authorized API options remain available through the catalog executor.
+
+### History with channel filters
+
+When channel filtering is enabled, a visible page can be empty while
+`exhausted` is false. Continue with `next_cursor`: it uses the original page
+boundary so filtered messages do not cause a loop or premature completion.
+`policy_page` reports original first/last message IDs and count; those metadata
+can reveal that filtered messages exist, but do not include their contents.
+See [access-policy limits](access-policies.md#filtered-history-pagination).
