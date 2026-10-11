@@ -26,6 +26,7 @@ from starlette.routing import Route
 
 from thinkhome_zulip_mcp.auth import Authenticator
 from thinkhome_zulip_mcp.catalog import resolve_reference
+from thinkhome_zulip_mcp.channels import channel_info, list_channels
 from thinkhome_zulip_mcp.conversations import Conversations
 from thinkhome_zulip_mcp.downloads import download_file
 from thinkhome_zulip_mcp.events import EventQueues
@@ -113,7 +114,8 @@ def create_server(
                 "issuer_url": config.issuer or config.resource_url,
                 "resource_server_url": config.resource_url,
                 "required_scopes": ["zulip:access"],
-                "validate_token_resource": True,
+                # This is a boolean OAuth validation flag, not a credential.
+                "validate_token_resource": True,  # nosec B105
             }
         )
     executor = executor or Executor()
@@ -229,7 +231,8 @@ def create_server(
         )
         async def zulip_stage_file(path: str) -> dict[str, Any]:
             """Stage a relative file under the configured allowed root."""
-            assert executor.files is not None
+            # Registration above requires files; this assertion only narrows the type.
+            assert executor.files is not None  # nosec B101
             return asdict(await executor.files.import_local(current_principal(), path))
 
     if executor.files:
@@ -1177,8 +1180,550 @@ def create_server(
             ],
         }
 
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_list_channels(
+        include_public: bool = True,
+        include_subscribed: bool = True,
+        include_web_public: bool = False,
+        exclude_archived: bool = True,
+        include_all: bool = False,
+        include_all_active: bool = False,
+        include_default: bool = False,
+        include_owner_subscribed: bool = False,
+        include_can_access_content: bool = False,
+        limit: Annotated[int, Field(ge=1, le=1000, strict=True)] = 100,
+        offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+        fields: Annotated[list[str] | None, Field(max_length=100)] = None,
+    ) -> CallToolResult:
+        """List caller-visible channels with upstream inclusion flags and live offsets.
+
+        Metadata access does not grant message access. include_all_active is the
+        legacy alias of include_all. Reuse next_offset with unchanged filters.
+        fields selects extra values in formatted text; raw streams stay complete.
+        """
+        return _tool_result(
+            await list_channels(
+                executor,
+                current_principal,
+                include_public=include_public,
+                include_subscribed=include_subscribed,
+                include_web_public=include_web_public,
+                exclude_archived=exclude_archived,
+                include_all=include_all,
+                include_all_active=include_all_active,
+                include_default=include_default,
+                include_owner_subscribed=include_owner_subscribed,
+                include_can_access_content=include_can_access_content,
+                limit=limit,
+                offset=offset,
+                fields=fields,
+            ),
+            "Channels received; inspect next_offset.",
+        )
+
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_get_channel(
+        name: str | None = None,
+        stream_id: Annotated[int | None, Field(ge=1, strict=True)] = None,
+        include_subscribers: bool = False,
+        include_member_profiles: bool = False,
+        include_topics: bool = False,
+        topic_limit: Annotated[int, Field(ge=1, le=1000, strict=True)] = 100,
+        topic_offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+    ) -> CallToolResult:
+        """Read a channel by name/ID, optionally including members and recent topics.
+
+        If both name and ID are supplied they must agree. Inspect partial/errors
+        for optional sections and next_topic_offset for the live topic list.
+        """
+        return _tool_result(
+            await channel_info(
+                executor,
+                current_principal,
+                name=name,
+                stream_id=stream_id,
+                include_subscribers=include_subscribers,
+                include_member_profiles=include_member_profiles,
+                include_topics=include_topics,
+                topic_limit=topic_limit,
+                topic_offset=topic_offset,
+            ),
+            "Channel received; inspect partial/errors and next_topic_offset.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_update_subscription_property(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        property: Literal[
+            "color",
+            "is_muted",
+            "in_home_view",
+            "pin_to_top",
+            "desktop_notifications",
+            "audible_notifications",
+            "push_notifications",
+            "email_notifications",
+            "wildcard_mentions_notify",
+        ],
+        value: str | Annotated[bool, Field(strict=True)],
+    ) -> CallToolResult:
+        """Set one property of the caller's channel subscription.
+
+        Color requires a hex-color string; other properties require a boolean.
+        in_home_view is the legacy inverse of is_muted. No automatic write retry.
+        """
+        if (property == "color" and not isinstance(value, str)) or (
+            property != "color" and type(value) is not bool
+        ):
+            return _tool_result(
+                OperationResult(
+                    str(uuid4()), error={"code": "invalid_subscription_value"}
+                ),
+                "",
+            )
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-subscription-property",
+                {
+                    "stream_id": stream_id,
+                    "property": property,
+                    "value": value,
+                },
+            ),
+            "Subscription property updated.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_update_subscription_settings(
+        subscription_data: Annotated[list[dict[str, Any]], Field(max_length=1000)],
+    ) -> CallToolResult:
+        """Set multiple caller subscription properties in one upstream request.
+
+        Each entry has stream_id, property and value. Color takes a string;
+        other properties take booleans. Active channel policy checks every
+        target before writing. No automatic retry or rollback guarantee.
+        """
+        if any(
+            type(change.get("stream_id")) is not int
+            or change["stream_id"] < 1
+            or (
+                change.get("property") == "color"
+                and not isinstance(change.get("value"), str)
+            )
+            or (
+                change.get("property") != "color"
+                and type(change.get("value")) is not bool
+            )
+            for change in subscription_data
+        ):
+            return _tool_result(
+                OperationResult(
+                    str(uuid4()), error={"code": "invalid_subscription_value"}
+                ),
+                "",
+            )
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-subscription-settings",
+                {
+                    "subscription_data": subscription_data,
+                },
+            ),
+            "Subscription settings updated.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_unsubscribe(
+        subscriptions: Annotated[
+            list[Annotated[str, Field(min_length=1)]], Field(max_length=1000)
+        ],
+        principals: list[Annotated[int, Field(ge=1, strict=True)]]
+        | list[Annotated[str, Field(min_length=1)]]
+        | None = None,
+    ) -> CallToolResult:
+        """Remove channel subscriptions for the caller or explicit user IDs/API emails.
+
+        Zulip enforces permission to change other users' memberships. Channel
+        policy preflights names and checks them again after writing; a changed
+        or inaccessible name can report uncertain_write. Never auto-retried.
+        """
+        arguments: dict[str, Any] = {"subscriptions": subscriptions}
+        if principals is not None:
+            arguments["principals"] = principals
+        return _tool_result(
+            await executor.execute(current_principal(), "unsubscribe", arguments),
+            "Subscriptions removed.",
+        )
+
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_get_subscriptions(
+        include_subscribers: Literal["true", "false", "partial"] = "false",
+    ) -> CallToolResult:
+        """Read the caller's subscribed channels and notification settings.
+
+        Use true for complete subscriber IDs or partial for server-selected
+        active/bot members in large channels. Channel policy filters inaccessible
+        channels while retaining each allowed channel's subscription settings.
+        """
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-subscriptions",
+                {
+                    "include_subscribers": include_subscribers,
+                },
+            ),
+            "Subscriptions received.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_archive_channel(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+    ) -> CallToolResult:
+        """Archive a channel under the caller's Zulip and channel-policy permissions."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(), "archive-stream", {"stream_id": stream_id}
+            ),
+            "Channel archived.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_delete_topic(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        topic_name: str,
+    ) -> CallToolResult:
+        """Delete a topic's messages, including an empty-name topic when supplied.
+
+        This is destructive. Inspect complete: false means deletion is partial.
+        Zulip authorizes the caller; no automatic retry.
+        """
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "delete-topic",
+                {
+                    "stream_id": stream_id,
+                    "topic_name": topic_name,
+                },
+            ),
+            "Topic deletion request returned; inspect complete and uncertainty.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_update_channel(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        settings: dict[str, Any],
+    ) -> CallToolResult:
+        """Update channel settings using the complete catalog update-stream schema.
+
+        Describe update-stream for supported settings: name, description,
+        privacy/history, retention, archive/default state, folder, topics policy
+        and permission groups. Explicit null is retained where supported.
+        settings cannot override stream_id. No automatic retry.
+        """
+        if "stream_id" in settings:
+            return _tool_result(
+                OperationResult(
+                    str(uuid4()), error={"code": "invalid_channel_settings"}
+                ),
+                "",
+            )
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-stream",
+                {
+                    **settings,
+                    "stream_id": stream_id,
+                },
+            ),
+            "Channel settings updated.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_subscribe(
+        subscriptions: Annotated[list[dict[str, Any]], Field(max_length=1000)],
+        principals: list[Annotated[int, Field(ge=1, strict=True)]]
+        | list[Annotated[str, Field(min_length=1)]]
+        | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> CallToolResult:
+        """Subscribe users or create channels using the catalog subscribe schema.
+
+        Omit principals to subscribe the caller. Describe subscribe for creation,
+        notification and permission settings. Options cannot replace targets.
+        Zulip authorizes changes to other users. No automatic retry.
+        """
+        arguments = dict(options or {})
+        if {"subscriptions", "principals"} & arguments.keys():
+            return _tool_result(
+                OperationResult(
+                    str(uuid4()), error={"code": "invalid_subscription_options"}
+                ),
+                "",
+            )
+        arguments["subscriptions"] = subscriptions
+        if principals is not None:
+            arguments["principals"] = principals
+        return _tool_result(
+            await executor.execute(current_principal(), "subscribe", arguments),
+            "Subscription request returned; inspect per-user results.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_set_topic_visibility(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        topic: str,
+        visibility_policy: Annotated[int, Field(ge=0, le=3, strict=True)],
+    ) -> CallToolResult:
+        """Set the caller's topic preference, including empty topic names.
+
+        Policies: 0 resets the preference, 1 mutes, 2 unmutes even in a muted
+        channel, 3 follows. This changes only the authenticated user's setting.
+        """
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-user-topic",
+                {
+                    "stream_id": stream_id,
+                    "topic": topic,
+                    "visibility_policy": visibility_policy,
+                },
+            ),
+            "Topic visibility updated.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_set_default_channel(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        enabled: Annotated[bool, Field(strict=True)],
+    ) -> CallToolResult:
+        """Add/remove a default channel for new users; requires Zulip admin rights.
+
+        This changes organization defaults, not existing users' subscriptions.
+        Zulip rejects channels that cannot be defaults, such as private channels.
+        """
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "add-default-stream" if enabled else "remove-default-stream",
+                {"stream_id": stream_id},
+            ),
+            "Default channel setting updated.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_mark_channel_read(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        topic: str | None = None,
+    ) -> CallToolResult:
+        """Mark a channel or one topic read for the caller using legacy Zulip APIs.
+
+        Omit topic for the whole channel; an empty string selects the unnamed
+        topic. These endpoints are deprecated upstream but supported by the
+        pinned Zulip version. No automatic retries after an uncertain response.
+        """
+        arguments: dict[str, Any] = {"stream_id": stream_id}
+        if topic is not None:
+            arguments["topic_name"] = topic
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "mark-stream-as-read" if topic is None else "mark-topic-as-read",
+                arguments,
+            ),
+            "Messages marked read for the caller.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_update_channel_message_flags(
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+        flag: str,
+        op: Literal["add", "remove"],
+        topic: str | None = None,
+        anchor: Annotated[int, Field(ge=1, strict=True)]
+        | Literal["newest", "oldest", "first_unread"] = "first_unread",
+        num_before: Annotated[int, Field(ge=0, strict=True)] = 0,
+        num_after: Annotated[int, Field(ge=0, strict=True)] = 1000,
+        include_anchor: bool = True,
+    ) -> CallToolResult:
+        """Update personal flags over a bounded channel/topic message range.
+
+        Zulip validates flag names. Empty topic selects the unnamed topic.
+        Inspect processed_count, updated_count, first/last_processed_id and
+        found_oldest/newest: one request may not cover the whole channel.
+        No automatic continuation or retry; choose a new anchor explicitly.
+        """
+        narrow: list[dict[str, Any]] = [{"operator": "channel", "operand": stream_id}]
+        if topic is not None:
+            narrow.append({"operator": "topic", "operand": topic})
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-message-flags-for-narrow",
+                {
+                    "narrow": narrow,
+                    "flag": flag,
+                    "op": op,
+                    "anchor": str(anchor),
+                    "num_before": num_before,
+                    "num_after": num_after,
+                    "include_anchor": include_anchor,
+                },
+            ),
+            "Message flags updated; inspect the processed range and continuation.",
+        )
+
+    @server.tool(
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=True,
+            open_world_hint=True,
+        )
+    )
+    async def zulip_update_subscriptions(
+        add: Annotated[list[dict[str, Any]] | None, Field(max_length=1000)] = None,
+        delete: Annotated[list[str] | None, Field(max_length=1000)] = None,
+    ) -> CallToolResult:
+        """Add/remove the caller's subscriptions in one upstream transaction.
+
+        Add entries support name, description and color. Delete entries are
+        channel names. An uncertain response must not be retried automatically.
+        """
+        if not add and not delete or len(add or []) + len(delete or []) > 1000:
+            return _tool_result(
+                OperationResult(
+                    str(uuid4()), error={"code": "invalid_subscription_batch"}
+                ),
+                "",
+            )
+        arguments: dict[str, Any] = {}
+        if add is not None:
+            arguments["add"] = add
+        if delete is not None:
+            arguments["delete"] = delete
+        return _tool_result(
+            await executor.execute(
+                current_principal(), "update-subscriptions", arguments
+            ),
+            "Subscription batch returned; inspect results and uncertainty.",
+        )
+
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_get_subscription_status(
+        user_id: Annotated[int, Field(ge=1, strict=True)],
+        stream_id: Annotated[int, Field(ge=1, strict=True)],
+    ) -> CallToolResult:
+        """Check a user's channel membership under the caller's access permissions.
+
+        Bot users are supported by the pinned Zulip version. False means not
+        subscribed; an inaccessible channel remains an error, not false.
+        """
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-subscription-status",
+                {"user_id": user_id, "stream_id": stream_id},
+            ),
+            "Subscription status received.",
+        )
+
     if executor.read_only:
         for name in (
+            "zulip_update_channel",
+            "zulip_archive_channel",
+            "zulip_delete_topic",
+            "zulip_unsubscribe",
+            "zulip_subscribe",
+            "zulip_update_subscriptions",
+            "zulip_set_topic_visibility",
+            "zulip_set_default_channel",
+            "zulip_mark_channel_read",
+            "zulip_update_channel_message_flags",
+            "zulip_update_subscription_settings",
+            "zulip_update_subscription_property",
             "zulip_reply",
             "zulip_listen",
             "zulip_update_status",

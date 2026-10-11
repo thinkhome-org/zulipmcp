@@ -403,7 +403,45 @@ class Executor:
             return replace(
                 result, data={"result": "success", "messages": visible_matches}
             )
-        if operation_id == "subscribe":
+        if operation_id == "update-subscription-settings":
+            if self.read_only:
+                return await self._execute(principal, operation_id, arguments)
+            try:
+                self._prepare(self.catalog[operation_id], arguments)
+                changes = arguments["subscription_data"]
+                if len(changes) > 1000 or any(
+                    type(change["stream_id"]) is not int or change["stream_id"] < 1
+                    for change in changes
+                ):
+                    raise ValueError("Invalid subscription batch")
+            except (ValueError, TypeError) as exc:
+                return OperationResult(
+                    str(uuid4()),
+                    error={"code": "invalid_arguments", "message": str(exc)},
+                )
+            try:
+                async with asyncio.timeout(30):
+                    for channel_id in dict.fromkeys(
+                        change["stream_id"] for change in changes
+                    ):
+                        lookup = await self.execute(
+                            principal, "get-stream-by-id", {"stream_id": channel_id}
+                        )
+                        if lookup.error:
+                            return lookup
+                        channel = lookup.data["stream"]
+                        if not self.channel_policy.allows_channel(
+                            channel["name"], private=channel["invite_only"], write=True
+                        ):
+                            return OperationResult(
+                                str(uuid4()), error={"code": "channel_policy_denied"}
+                            )
+            except TimeoutError:
+                return OperationResult(
+                    str(uuid4()), error={"code": "channel_policy_lookup_timeout"}
+                )
+            return await self._execute(principal, operation_id, arguments)
+        if operation_id in {"subscribe", "unsubscribe", "update-subscriptions"}:
             if self.read_only:
                 return await self._execute(principal, operation_id, arguments)
             try:
@@ -413,43 +451,129 @@ class Executor:
                     str(uuid4()),
                     error={"code": "invalid_arguments", "message": str(exc)},
                 )
-            targets: dict[str, int] = {}
-            for subscription in arguments["subscriptions"]:
-                name = subscription["name"]
-                resolved = await self.execute(
-                    principal, "get-stream-id", {"stream": name}
+            if operation_id == "update-subscriptions":
+                names = [item.get("name") for item in arguments.get("add", [])]
+                names.extend(arguments.get("delete", []))
+            elif operation_id == "subscribe":
+                names = [item.get("name") for item in arguments["subscriptions"]]
+            else:
+                names = arguments["subscriptions"]
+            if len(names) > 1000 or any(
+                not isinstance(name, str) or not name.strip() for name in names
+            ):
+                return OperationResult(
+                    str(uuid4()), error={"code": "invalid_arguments"}
                 )
-                if resolved.error:
-                    return resolved
-                channel_id = resolved.data["stream_id"]
-                channel = await self.execute(
-                    principal, "get-stream-by-id", {"stream_id": channel_id}
+            creation_names = {
+                item["name"].strip()
+                for item in (
+                    arguments.get("add", [])
+                    if operation_id == "update-subscriptions"
+                    else arguments.get("subscriptions", [])
+                    if operation_id == "subscribe"
+                    else []
                 )
-                if channel.error:
-                    return channel
-                metadata = channel.data["stream"]
-                if not self.channel_policy.allows_channel(
-                    metadata["name"], private=metadata["invite_only"], write=True
-                ):
-                    return OperationResult(
-                        str(uuid4()), error={"code": "channel_policy_denied"}
-                    )
-                targets[name] = channel_id
+            }
+            targets: dict[str, int | None] = {}
+            try:
+                async with asyncio.timeout(30):
+                    for name in dict.fromkeys(name.strip() for name in names):
+                        resolved = await self._execute(
+                            principal, "get-stream-id", {"stream": name}
+                        )
+                        if resolved.error:
+                            # A missing/inaccessible name is safe only if both possible
+                            # visibilities have write permission; never infer public.
+                            if (
+                                name in creation_names
+                                and resolved.status_code == 400
+                                and isinstance(resolved.data, dict)
+                                and resolved.data.get("code") == "BAD_REQUEST"
+                                and all(
+                                    self.channel_policy.allows_channel(
+                                        name, private=private, write=True
+                                    )
+                                    for private in (False, True)
+                                )
+                            ):
+                                targets[name] = None
+                                continue
+                            return OperationResult(
+                                str(uuid4()), error={"code": "channel_policy_denied"}
+                            )
+                        channel_id = (
+                            resolved.data.get("stream_id")
+                            if isinstance(resolved.data, dict)
+                            else None
+                        )
+                        if type(channel_id) is not int or channel_id <= 0:
+                            return OperationResult(
+                                str(uuid4()),
+                                error={"code": "invalid_upstream_response"},
+                            )
+                        channel = await self.execute(
+                            principal, "get-stream-by-id", {"stream_id": channel_id}
+                        )
+                        if channel.error:
+                            return channel
+                        metadata = channel.data["stream"]
+                        if not self.channel_policy.allows_channel(
+                            metadata["name"],
+                            private=metadata["invite_only"],
+                            write=True,
+                        ):
+                            return OperationResult(
+                                str(uuid4()), error={"code": "channel_policy_denied"}
+                            )
+                        targets[name] = channel_id
+            except TimeoutError:
+                return OperationResult(
+                    str(uuid4()), error={"code": "channel_policy_lookup_timeout"}
+                )
             result = await self._execute(principal, operation_id, arguments)
             if result.error:
                 return replace(result, data=None)
-            # Zulip subscribes by name; concurrent renames cannot be made atomic here.
-            for name, channel_id in targets.items():
-                resolved = await self.execute(
-                    principal, "get-stream-id", {"stream": name}
+            # Zulip changes subscriptions by name; concurrent renames are not atomic.
+            try:
+                async with asyncio.timeout(30):
+                    for name, channel_id in targets.items():
+                        resolved = await self.execute(
+                            principal, "get-stream-id", {"stream": name}
+                        )
+                        if resolved.error or (
+                            channel_id is not None
+                            and resolved.data["stream_id"] != channel_id
+                        ):
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "subscription_target_changed"},
+                                uncertain_write=True,
+                            )
+                        if channel_id is None:
+                            channel = await self.execute(
+                                principal,
+                                "get-stream-by-id",
+                                {"stream_id": resolved.data["stream_id"]},
+                            )
+                            if channel.error or not self.channel_policy.allows_channel(
+                                channel.data["stream"]["name"],
+                                private=channel.data["stream"]["invite_only"],
+                                write=True,
+                            ):
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "subscription_target_changed"},
+                                    uncertain_write=True,
+                                )
+            except TimeoutError:
+                return replace(
+                    result,
+                    data=None,
+                    error={"code": "channel_policy_lookup_timeout"},
+                    uncertain_write=True,
                 )
-                if resolved.error or resolved.data["stream_id"] != channel_id:
-                    return replace(
-                        result,
-                        data=None,
-                        error={"code": "subscription_target_changed"},
-                        uncertain_write=True,
-                    )
             return result
         if operation_id == "delete-queue":
             result = await self._execute(principal, operation_id, arguments)
@@ -877,12 +1001,35 @@ class Executor:
             "get-stream-topics",
             "get-subscribers",
             "get-subscription-status",
+            "update-subscription-property",
+            "archive-stream",
+            "update-stream",
+            "delete-topic",
+            "update-user-topic",
+            "update-message-flags-for-narrow",
+            "mark-stream-as-read",
+            "mark-topic-as-read",
+            "add-default-stream",
+            "remove-default-stream",
         }:
             # shortcut: deny other paths until their channel guards are implemented.
             return OperationResult(
                 str(uuid4()), error={"code": "channel_policy_not_supported"}
             )
-        if self.read_only and operation_id in {"send-message", "set-typing-status"}:
+        if self.read_only and operation_id in {
+            "send-message",
+            "set-typing-status",
+            "update-subscription-property",
+            "archive-stream",
+            "update-stream",
+            "delete-topic",
+            "update-user-topic",
+            "update-message-flags-for-narrow",
+            "mark-stream-as-read",
+            "mark-topic-as-read",
+            "add-default-stream",
+            "remove-default-stream",
+        }:
             return await self._execute(principal, operation_id, arguments)
         try:
             self._prepare(self.catalog[operation_id], arguments)
@@ -908,6 +1055,27 @@ class Executor:
             if operation_id == "get-stream-id"
             else "stream_id"
         )
+        if operation_id == "update-message-flags-for-narrow":
+            # Zulip's `with` rewrites channel/topic constraints before executing.
+            if any(
+                (isinstance(term, dict) and term.get("operator") == "with")
+                or (isinstance(term, list) and term and term[0] == "with")
+                for term in arguments["narrow"]
+            ):
+                return denied
+            scopes = [
+                term
+                for term in arguments["narrow"]
+                if isinstance(term, dict)
+                and term.get("operator") in {"channel", "stream"}
+                and term.get("negated", False) is False
+                and type(term.get("operand")) is int
+                and term["operand"] > 0
+            ]
+            # shortcut: broader flag narrows need a separate policy-scoped adapter.
+            if len(scopes) != 1:
+                return denied
+            target = scopes[0]["operand"]
         if isinstance(target, list):
             if len(target) != 1:
                 return denied
@@ -936,9 +1104,34 @@ class Executor:
         if not self.channel_policy.allows_channel(
             stream["name"],
             private=stream["invite_only"],
-            write=operation_id in {"send-message", "set-typing-status"},
+            write=operation_id
+            in {
+                "send-message",
+                "set-typing-status",
+                "update-subscription-property",
+                "archive-stream",
+                "update-stream",
+                "delete-topic",
+                "update-user-topic",
+                "update-message-flags-for-narrow",
+                "mark-stream-as-read",
+                "mark-topic-as-read",
+                "add-default-stream",
+                "remove-default-stream",
+            },
         ):
             return denied
+        if operation_id == "update-stream":
+            resulting_name = arguments.get("new_name", stream["name"])
+            resulting_private = arguments.get("is_private", stream["invite_only"])
+            if (
+                not isinstance(resulting_name, str)
+                or type(resulting_private) is not bool
+                or not self.channel_policy.allows_channel(
+                    resulting_name.strip(), private=resulting_private, write=True
+                )
+            ):
+                return denied
         if operation_id == "get-stream-id":
             return replace(lookup, data={"result": "success", "stream_id": target})
         if operation_id == "get-stream-by-id":
