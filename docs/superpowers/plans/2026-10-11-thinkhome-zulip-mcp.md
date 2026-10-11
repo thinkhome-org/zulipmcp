@@ -163,6 +163,12 @@ Unit, executor-wire, stdio and authenticated HTTP fixtures cover pagination,
 identity selection and token revocation during a batch. Live Zulip workflow
 acceptance and the remaining convenience tools are still pending.
 
+Message tool progress: dedicated read/send/DM/edit/reaction/move/resolve tools
+use the shared executor. Move and resolve have explicit notification/propagation
+behavior and channel lookup validation. Wire tests cover the basic operations;
+reference normalization, configurable channel policies and full workflow parity
+remain incomplete.
+
 ## Úloha 6A — Povinná úplná parita tří MCP referencí kromě Hermes
 
 **Doplněný požadavek uživatele:** výsledný projekt musí mít nejméně všechny funkce

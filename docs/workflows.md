@@ -37,3 +37,51 @@ reauthorizes under the current caller; a message ID grants no access by itself.
 
 Anchor behavior follows pinned Zulip 12.3 `zerver/lib/narrow.py` (parse anchor,
 one-sided range queries and post-processing), with `include_anchor=false`.
+
+## Message editing and topic moves
+
+- `zulip_edit_message(message_id, content)` normalizes outgoing Markdown before sending. Zulip
+  enforces who may edit and its configured time limits.
+- `zulip_move_messages(message_id, topic, stream="", propagate_mode="change_one")`
+  requests notifications in both old and new topics. Optional `stream` is the
+  destination channel name, resolved under the caller's identity before writing.
+  Lookup failure prevents the move. Access is refreshed before the write.
+- `zulip_resolve_topic(message_id, topic, propagate_mode="change_all")` silently
+  sets the full topic name supplied by the caller. Include `✔ ` to resolve, or
+  remove it to unresolve. Both notification flags are false.
+
+Propagation accepts `change_one`, `change_later`, or `change_all`. These operations
+can affect multiple messages; inspect the source and destination before moving.
+Upstream permission errors and uncertain writes retain the standard executor
+response. No automatic rollback is performed.
+
+This implements the basic reference move/resolve semantics. Configured channel allowlists and other reference message policies
+are still pending, so these tools do not yet establish full reference parity.
+
+## Reading, sending and reactions
+
+- `zulip_get_message(message_id, apply_markdown=false)` returns the accessible
+  message with raw Markdown by default and supports empty topic names.
+- `zulip_send_message(stream, topic, content)` accepts a channel name or ID.
+- `zulip_send_direct_message(recipients, content)` accepts a nonempty list of user
+  IDs or Zulip API email addresses, including group DMs.
+- `zulip_add_reaction` and `zulip_remove_reaction` accept `message_id`,
+  `emoji_name`, and optional `emoji_code` / `reaction_type` for exact custom emoji
+  selection. They change the authenticated caller's reaction.
+
+Sending and editing apply the reference Markdown fixes by default. Set
+`ZULIPMCP_MARKDOWN_AUTOFIX=0` or `false` to preserve content unchanged. Dedicated
+message tools enforce `ZULIP_MAX_MESSAGE_LENGTH` (default 10,000 characters)
+before and after normalization. Set a positive integer before server startup;
+invalid values reject startup. The limit is reported by `zulip_capabilities`.
+Zulip still enforces its own limits. Configured channel policies remain pending. These tools never accept credentials, origin or sender overrides;
+advanced authorized API options remain available through the catalog executor.
+
+### History with channel filters
+
+When channel filtering is enabled, a visible page can be empty while
+`exhausted` is false. Continue with `next_cursor`: it uses the original page
+boundary so filtered messages do not cause a loop or premature completion.
+`policy_page` reports original first/last message IDs and count; those metadata
+can reveal that filtered messages exist, but do not include their contents.
+See [access-policy limits](access-policies.md#filtered-history-pagination).

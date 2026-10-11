@@ -42,6 +42,12 @@ redirects require configured HTTPS origins. Alternative authentication remains p
 No live Zulip or production operation has been verified; protocol tests use
 disposable local HTTP and ASGI fixtures.
 
+Set `ZULIPCHAT_READ_ONLY=true` to enforce read-only Zulip access across tools
+and batches. See [access policies and audit limitations](docs/access-policies.md).
+
+[User tools](docs/user-discovery.md) support profile lookup, named custom fields,
+name/email matching, presence, status, groups and caller-specific mute preferences.
+
 ## Identity provisioning
 
 Local administrator commands now manage encrypted identities, expiring manual
@@ -68,9 +74,12 @@ uv build
 See [CONTRIBUTING](CONTRIBUTING.md), the
 [design](docs/superpowers/specs/2026-10-11-thinkhome-zulip-mcp-design.md), and the
 [implementation plan](docs/superpowers/plans/2026-10-11-thinkhome-zulip-mcp.md).
+Security scans, their exact exceptions and upstream change reports are described
+in [security checks](docs/security-checks.md).
 
-Project code is licensed under [MIT](LICENSE). Bundled Zulip material retains its
-[Apache-2.0 license](src/thinkhome_zulip_mcp/data/ZULIP-LICENSE).
+Original project code is licensed under [MIT](LICENSE). Bundled Zulip material
+and adapted windborne Markdown helpers retain Apache-2.0; see
+[third-party notices](src/thinkhome_zulip_mcp/data/THIRD-PARTY-NOTICES.md).
 Publication targets remain pending; no release is published.
 
 ## Required reference parity
@@ -83,6 +92,7 @@ the complete audited Zulip application API. See the pinned
 tracking document, not a claim that those features are already implemented.
 
 Managed event registration, bounded polling and deletion are documented in
-[event queues](docs/events.md) and [bounded batch/history tools](docs/workflows.md).
+[event queues](docs/events.md), [conversation workflows](docs/conversations.md) and
+[bounded batch/history tools](docs/workflows.md).
 Full reference listening/session behavior remains
 in progress.
