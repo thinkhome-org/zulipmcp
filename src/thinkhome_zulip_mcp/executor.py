@@ -287,6 +287,26 @@ class Executor:
         )
         return path, query, form, json_body, authenticated, file_handles
 
+    async def _channel_visible(
+        self, principal: Principal, stream_id: int
+    ) -> bool | None:
+        lookup = await self._execute(
+            principal, "get-stream-by-id", {"stream_id": stream_id}
+        )
+        stream = lookup.data.get("stream") if isinstance(lookup.data, dict) else None
+        if (
+            lookup.error
+            or not isinstance(stream, dict)
+            or type(stream.get("stream_id")) is not int
+            or stream["stream_id"] != stream_id
+            or not isinstance(stream.get("name"), str)
+            or type(stream.get("invite_only")) is not bool
+        ):
+            return None
+        return self.channel_policy.allows_channel(
+            stream["name"], private=stream["invite_only"]
+        )
+
     async def execute(
         self, principal: Principal, operation_id: str, arguments: dict[str, Any]
     ) -> OperationResult:
@@ -426,34 +446,16 @@ class Executor:
                                     error={"code": "invalid_events_response"},
                                 )
                             if stream_id not in event_channels:
-                                lookup = await self._execute(
-                                    principal,
-                                    "get-stream-by-id",
-                                    {"stream_id": stream_id},
+                                decision = await self._channel_visible(
+                                    principal, stream_id
                                 )
-                                stream = (
-                                    lookup.data.get("stream")
-                                    if isinstance(lookup.data, dict)
-                                    else None
-                                )
-                                if (
-                                    lookup.error
-                                    or not isinstance(stream, dict)
-                                    or type(stream.get("stream_id")) is not int
-                                    or stream["stream_id"] != stream_id
-                                    or not isinstance(stream.get("name"), str)
-                                    or type(stream.get("invite_only")) is not bool
-                                ):
+                                if decision is None:
                                     return replace(
                                         result,
                                         data=None,
                                         error={"code": "channel_policy_lookup_failed"},
                                     )
-                                event_channels[stream_id] = (
-                                    self.channel_policy.allows_channel(
-                                        stream["name"], private=stream["invite_only"]
-                                    )
-                                )
+                                event_channels[stream_id] = decision
                             allowed = event_channels[stream_id]
                         if allowed:
                             visible.append(event)
@@ -506,34 +508,16 @@ class Executor:
                                     error={"code": "invalid_upstream_response"},
                                 )
                             if stream_id not in channels:
-                                lookup = await self._execute(
-                                    principal,
-                                    "get-stream-by-id",
-                                    {"stream_id": stream_id},
+                                decision = await self._channel_visible(
+                                    principal, stream_id
                                 )
-                                stream = (
-                                    lookup.data.get("stream")
-                                    if isinstance(lookup.data, dict)
-                                    else None
-                                )
-                                if (
-                                    lookup.error
-                                    or not isinstance(stream, dict)
-                                    or type(stream.get("stream_id")) is not int
-                                    or stream["stream_id"] != stream_id
-                                    or not isinstance(stream.get("name"), str)
-                                    or type(stream.get("invite_only")) is not bool
-                                ):
+                                if decision is None:
                                     return replace(
                                         result,
                                         data=None,
                                         error={"code": "channel_policy_lookup_failed"},
                                     )
-                                channels[stream_id] = (
-                                    self.channel_policy.allows_channel(
-                                        stream["name"], private=stream["invite_only"]
-                                    )
-                                )
+                                channels[stream_id] = decision
                             if channels[stream_id]:
                                 visible.append(message)
             except TimeoutError:
@@ -633,12 +617,51 @@ class Executor:
                     result, data=None, error={"code": "channel_policy_denied"}
                 )
             return replace(result, data={"result": "success", "message": message})
-        if operation_id == "get-streams":
+        if operation_id == "get-user-channels":
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            channel_ids = (
+                result.data.get("subscribed_channel_ids")
+                if isinstance(result.data, dict)
+                else None
+            )
+            if (
+                not isinstance(channel_ids, list)
+                or any(type(value) is not int or value <= 0 for value in channel_ids)
+                or len(set(channel_ids)) != len(channel_ids)
+            ):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            allowed_ids = []
+            try:
+                async with asyncio.timeout(30):
+                    for stream_id in channel_ids:
+                        decision = await self._channel_visible(principal, stream_id)
+                        if decision is None:
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "channel_policy_lookup_failed"},
+                            )
+                        if decision:
+                            allowed_ids.append(stream_id)
+            except TimeoutError:
+                return replace(
+                    result, data=None, error={"code": "channel_policy_lookup_timeout"}
+                )
+            return replace(
+                result,
+                data={"result": "success", "subscribed_channel_ids": allowed_ids},
+            )
+        if operation_id in {"get-streams", "get-subscriptions"}:
+            collection = "streams" if operation_id == "get-streams" else "subscriptions"
             result = await self._execute(principal, operation_id, arguments)
             if result.error:
                 return replace(result, data=None)
             streams = (
-                result.data.get("streams") if isinstance(result.data, dict) else None
+                result.data.get(collection) if isinstance(result.data, dict) else None
             )
             if not isinstance(streams, list) or any(
                 not isinstance(stream, dict)
@@ -655,7 +678,7 @@ class Executor:
                 result,
                 data={
                     "result": "success",
-                    "streams": [
+                    collection: [
                         stream
                         for stream in streams
                         if self.channel_policy.allows_channel(

@@ -68,7 +68,8 @@ The windborne compatibility profile's default-private-denial remains pending.
 | Operations | Enforcement |
 |---|---|
 | `send-message` | Resolve and validate channel metadata, enforce read/write rules, send to the checked numeric ID; apply DM restriction for direct messages. |
-| `get-streams` | Validate each channel and filter the list under the current caller. |
+| `get-streams`, `get-subscriptions` | Validate each channel and filter the list under the current caller, retaining allowed subscription settings. |
+| `get-user-channels` | Resolve each returned channel ID under the acting caller, filter by current metadata and fail the complete result if any lookup cannot be validated. |
 | `get-stream-id`, `get-stream-by-id` | Check current channel name/privacy before returning metadata or ID. |
 | `get-messages` | Filter each page using current per-caller channel metadata and the DM rule; preserve traversal bounds for pagination. |
 | `get-message` | Validate exact message ID, check current channel metadata or the DM rule before returning content. |
