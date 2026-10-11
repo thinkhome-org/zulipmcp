@@ -150,6 +150,4196 @@
           "feature_level": "unknown; audited on 12.3"
         }
       }
+    },
+    "/realm/icon": {
+      "post": {
+        "operationId": "upload-realm-icon",
+        "summary": "Upload realm icon",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_icon.upload_icon",
+          "evidence": [
+            "zerver/views/realm_icon.py:18-41",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Replace organization branding image; server size/content/plan restrictions apply."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              },
+              "encoding": {}
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-realm-icon",
+        "summary": "Delete realm icon",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_icon.delete_icon_backend",
+          "evidence": [
+            "zerver/views/realm_icon.py:45-56",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Reset active branding source to default; cached image bytes may remain."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        }
+      },
+      "get": {
+        "operationId": "get-realm-icon",
+        "summary": "Get realm icon",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "authenticated user",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_icon.get_icon_backend",
+          "evidence": [
+            "zerver/views/realm_icon.py:59-67",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [],
+          "safe_read": true,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3",
+          "query_passthrough": "Upstream appends raw query string to redirect; additional query parameters not yet exposed."
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect to the configured image URL; do not forward credentials across origins.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Target image URL"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realm/logo": {
+      "post": {
+        "operationId": "upload-realm-logo",
+        "summary": "Upload realm logo",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_logo.upload_logo",
+          "evidence": [
+            "zerver/views/realm_logo.py:21-42",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Replace organization branding image; server size/content/plan restrictions apply."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "night": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "file",
+                  "night"
+                ]
+              },
+              "encoding": {
+                "night": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-realm-logo",
+        "summary": "Delete realm logo",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_logo.delete_logo_backend",
+          "evidence": [
+            "zerver/views/realm_logo.py:47-56",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Reset active branding source to default; cached image bytes may remain."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "night": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "night"
+                ]
+              },
+              "encoding": {
+                "night": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get-realm-logo",
+        "summary": "Get realm logo",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "authenticated user",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_logo.get_logo_backend",
+          "evidence": [
+            "zerver/views/realm_logo.py:60-70",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [],
+          "safe_read": true,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3",
+          "query_passthrough": "Upstream appends raw query string to redirect; additional query parameters not yet exposed."
+        },
+        "responses": {
+          "302": {
+            "description": "Redirect to the configured image URL; do not forward credentials across origins.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Target image URL"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "night",
+            "in": "query",
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/realm/deactivate": {
+      "post": {
+        "operationId": "deactivate-realm",
+        "summary": "Deactivate realm",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_owner; demo organization and server deletion retention policy",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm.deactivate_realm",
+          "evidence": [
+            "zerver/views/realm.py:588-647",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Deactivate organization and possibly schedule irreversible data deletion."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deletion_delay_days": {
+                    "type": "integer",
+                    "nullable": true
+                  }
+                },
+                "required": []
+              },
+              "encoding": {
+                "deletion_delay_days": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/export/realm/{export_id}": {
+      "delete": {
+        "operationId": "delete-realm-export",
+        "summary": "Delete realm export",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm_export.delete_realm_export",
+          "evidence": [
+            "zerver/views/realm_export.py:128-141",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Delete an eligible export belonging to the caller organization."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      }
+    },
+    "/submessage": {
+      "post": {
+        "operationId": "send-submessage",
+        "summary": "Send submessage",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "access_message(modifying); verify_submessage_sender; widget author policy",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.submessage.process_submessage",
+          "evidence": [
+            "zerver/views/submessage.py:21-65",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Append submessage; poll/todo widget payload validated by Zulip."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "message_id": {
+                    "type": "integer"
+                  },
+                  "msg_type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content",
+                  "message_id",
+                  "msg_type"
+                ]
+              },
+              "encoding": {
+                "message_id": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/zcommand": {
+      "post": {
+        "operationId": "process-zcommand",
+        "summary": "Process zcommand",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "authenticated user; command-specific validation",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.message_send.zcommand_backend",
+          "evidence": [
+            "zerver/views/message_send.py:149-152",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210",
+            "zerver/lib/zcommand.py:15-83"
+          ],
+          "side_effects": [
+            "/dark and /light update color scheme; /fluid-width and /fixed-width update layout; /ping is a no-op."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "command": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "command"
+                ]
+              },
+              "encoding": {}
+            }
+          }
+        }
+      }
+    },
+    "/default_stream_groups/create": {
+      "post": {
+        "operationId": "create-default-stream-group",
+        "summary": "Create default stream group",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "can_manage_default_streams(); stream/group access checked by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.streams.create_default_stream_group",
+          "evidence": [
+            "zerver/views/streams.py:183-196",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Create default channel group."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "group_name": {
+                    "type": "string"
+                  },
+                  "stream_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "description",
+                  "group_name",
+                  "stream_names"
+                ]
+              },
+              "encoding": {
+                "stream_names": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/default_stream_groups/{group_id}": {
+      "patch": {
+        "operationId": "update-default-stream-group",
+        "summary": "Update default stream group",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "can_manage_default_streams(); stream/group access checked by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.streams.update_default_stream_group_info",
+          "evidence": [
+            "zerver/views/streams.py:201-217",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Change default group name/description; at least one must be nonempty."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "new_description": {
+                    "type": "string"
+                  },
+                  "new_group_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "anyOf": [
+                  {
+                    "required": [
+                      "new_description"
+                    ],
+                    "properties": {
+                      "new_description": {
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  {
+                    "required": [
+                      "new_group_name"
+                    ],
+                    "properties": {
+                      "new_group_name": {
+                        "minLength": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              "encoding": {}
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-default-stream-group",
+        "summary": "Delete default stream group",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "can_manage_default_streams(); stream/group access checked by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.streams.remove_default_stream_group",
+          "evidence": [
+            "zerver/views/streams.py:247-252",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Remove default group."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      }
+    },
+    "/default_stream_groups/{group_id}/streams": {
+      "patch": {
+        "operationId": "update-default-stream-group-streams",
+        "summary": "Update default stream group streams",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "can_manage_default_streams(); stream/group access checked by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.streams.update_default_stream_group_streams",
+          "evidence": [
+            "zerver/views/streams.py:222-242",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Add/remove channels from default group."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "add",
+                      "remove"
+                    ]
+                  },
+                  "stream_names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "op",
+                  "stream_names"
+                ]
+              },
+              "encoding": {
+                "stream_names": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages/summary": {
+      "get": {
+        "operationId": "summarize-messages",
+        "summary": "Summarize messages",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "can_summarize_topics(); model enabled; user monthly credit limit",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.message_summary.get_messages_summary",
+          "evidence": [
+            "zerver/views/message_summary.py:16-39",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Invokes server-configured AI summarization and may consume credits. Not safe for automatic retry."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "narrow",
+            "in": "query",
+            "required": false,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "operator",
+                          "operand"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "operator": {
+                            "type": "string"
+                          },
+                          "operand": {
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            ]
+                          },
+                          "negated": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "minItems": 2,
+                        "maxItems": 2
+                      }
+                    ]
+                  },
+                  "nullable": true
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "/calls/zoom/create": {
+      "post": {
+        "operationId": "create-zoom-call",
+        "summary": "Create zoom call",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "authenticated user; configured Zoom provider/server or user OAuth credentials",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.video_calls.make_zoom_video_call",
+          "evidence": [
+            "zerver/views/video_calls.py:515-539",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Create external Zoom meeting; provider authentication may be required."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_video_call": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": []
+              },
+              "encoding": {
+                "is_video_call": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bots": {
+      "get": {
+        "operationId": "get-owned-bots",
+        "summary": "Get owned bots",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_human_non_guest_user; only active bots owned by caller",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.users.get_bots_backend",
+          "evidence": [
+            "zerver/views/users.py:775-801",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [],
+          "safe_read": true,
+          "sensitive_response": true,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        }
+      },
+      "post": {
+        "operationId": "create-bot",
+        "summary": "Create bot",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_human_non_guest_user; check_can_create_bot; bot type/service/realm policy",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.users.add_bot_backend",
+          "evidence": [
+            "zerver/views/users.py:631-771",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Create bot and possible service/configuration; returns new API key; optional avatar file."
+          ],
+          "safe_read": false,
+          "sensitive_response": true,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bot_type": {
+                    "type": "integer"
+                  },
+                  "config_data": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "default_all_public_streams": {
+                    "type": "boolean"
+                  },
+                  "default_events_register_stream": {
+                    "type": "string"
+                  },
+                  "default_sending_stream": {
+                    "type": "string"
+                  },
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "interface_type": {
+                    "type": "integer"
+                  },
+                  "payload_url": {
+                    "type": "string"
+                  },
+                  "service_name": {
+                    "type": "string"
+                  },
+                  "short_name": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "full_name",
+                  "short_name"
+                ]
+              },
+              "encoding": {
+                "bot_type": {
+                  "contentType": "application/json"
+                },
+                "config_data": {
+                  "contentType": "application/json"
+                },
+                "default_all_public_streams": {
+                  "contentType": "application/json"
+                },
+                "interface_type": {
+                  "contentType": "application/json"
+                },
+                "payload_url": {
+                  "contentType": "application/json"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bot_type": {
+                    "type": "integer"
+                  },
+                  "config_data": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "default_all_public_streams": {
+                    "type": "boolean"
+                  },
+                  "default_events_register_stream": {
+                    "type": "string"
+                  },
+                  "default_sending_stream": {
+                    "type": "string"
+                  },
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "interface_type": {
+                    "type": "integer"
+                  },
+                  "payload_url": {
+                    "type": "string"
+                  },
+                  "service_name": {
+                    "type": "string"
+                  },
+                  "short_name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "full_name",
+                  "short_name"
+                ]
+              },
+              "encoding": {
+                "bot_type": {
+                  "contentType": "application/json"
+                },
+                "config_data": {
+                  "contentType": "application/json"
+                },
+                "default_all_public_streams": {
+                  "contentType": "application/json"
+                },
+                "interface_type": {
+                  "contentType": "application/json"
+                },
+                "payload_url": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bots/{bot_id}": {
+      "delete": {
+        "operationId": "deactivate-bot",
+        "summary": "Deactivate bot",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "access_bot_by_id: can_admin_user; owner required for can_create_users bot; deactivation policy",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.users.deactivate_bot_backend",
+          "evidence": [
+            "zerver/views/users.py:174-180",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Deactivate bot account."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "update-bot",
+        "summary": "Update bot",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_human_non_guest_user; access_bot_by_id; role changes need admin/owner; can_create_users bot needs owner",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.users.patch_bot_backend",
+          "evidence": [
+            "zerver/views/users.py:472-599",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Update bot ownership, role, service, configuration and optional avatar."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bot_owner_id": {
+                    "type": "integer"
+                  },
+                  "config_data": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "default_all_public_streams": {
+                    "type": "boolean"
+                  },
+                  "default_events_register_stream": {
+                    "type": "string"
+                  },
+                  "default_sending_stream": {
+                    "type": "string"
+                  },
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "integer"
+                  },
+                  "service_interface": {
+                    "type": "integer",
+                    "default": 1
+                  },
+                  "service_payload_url": {
+                    "type": "string"
+                  },
+                  "short_name": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": []
+              },
+              "encoding": {
+                "bot_owner_id": {
+                  "contentType": "application/json"
+                },
+                "config_data": {
+                  "contentType": "application/json"
+                },
+                "default_all_public_streams": {
+                  "contentType": "application/json"
+                },
+                "role": {
+                  "contentType": "application/json"
+                },
+                "service_interface": {
+                  "contentType": "application/json"
+                },
+                "service_payload_url": {
+                  "contentType": "application/json"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bot_owner_id": {
+                    "type": "integer"
+                  },
+                  "config_data": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "default_all_public_streams": {
+                    "type": "boolean"
+                  },
+                  "default_events_register_stream": {
+                    "type": "string"
+                  },
+                  "default_sending_stream": {
+                    "type": "string"
+                  },
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "integer"
+                  },
+                  "service_interface": {
+                    "type": "integer",
+                    "default": 1
+                  },
+                  "service_payload_url": {
+                    "type": "string"
+                  },
+                  "short_name": {
+                    "type": "string"
+                  }
+                },
+                "required": []
+              },
+              "encoding": {
+                "bot_owner_id": {
+                  "contentType": "application/json"
+                },
+                "config_data": {
+                  "contentType": "application/json"
+                },
+                "default_all_public_streams": {
+                  "contentType": "application/json"
+                },
+                "role": {
+                  "contentType": "application/json"
+                },
+                "service_interface": {
+                  "contentType": "application/json"
+                },
+                "service_payload_url": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/avatar": {
+      "post": {
+        "operationId": "upload-own-avatar",
+        "summary": "Upload own avatar",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "self; avatar_changes_disabled requires admin override",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.user_settings.set_avatar_backend",
+          "evidence": [
+            "zerver/views/user_settings.py:550-573",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Replace caller avatar; server size/content limits."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              },
+              "encoding": {}
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-own-avatar",
+        "summary": "Delete own avatar",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "self; avatar_changes_disabled requires admin override",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.user_settings.delete_avatar_backend",
+          "evidence": [
+            "zerver/views/user_settings.py:576-587",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Reset caller avatar to default."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        }
+      }
+    },
+    "/realm/profile_fields/{field_id}": {
+      "delete": {
+        "operationId": "delete-profile-field",
+        "summary": "Delete profile field",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.custom_profile_fields.delete_realm_custom_profile_field",
+          "evidence": [
+            "zerver/views/custom_profile_fields.py:233-242",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Remove organization custom profile field."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "field_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "update-profile-field",
+        "summary": "Update profile field",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; policy enforced by Zulip",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.custom_profile_fields.update_realm_custom_profile_field",
+          "evidence": [
+            "zerver/views/custom_profile_fields.py:247-305",
+            "zproject/urls.py:314-612",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Update profile field; name trimmed; default external fields and summary limits checked upstream."
+          ],
+          "safe_read": false,
+          "sensitive_response": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3"
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result; Zulip validates permissions and instance policy."
+          }
+        },
+        "parameters": [
+          {
+            "name": "field_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "display_in_profile_summary": {
+                    "type": "boolean"
+                  },
+                  "editable_by_user": {
+                    "type": "boolean"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "use_for_user_matching": {
+                    "type": "boolean"
+                  },
+                  "field_data": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "hint": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": []
+              },
+              "encoding": {
+                "display_in_profile_summary": {
+                  "contentType": "application/json"
+                },
+                "editable_by_user": {
+                  "contentType": "application/json"
+                },
+                "field_data": {
+                  "contentType": "application/json"
+                },
+                "required": {
+                  "contentType": "application/json"
+                },
+                "use_for_user_matching": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realm": {
+      "patch": {
+        "operationId": "update-realm",
+        "summary": "Update organization settings",
+        "security": [
+          {
+            "basicAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "allow_message_editing": {
+                    "type": "boolean"
+                  },
+                  "authentication_methods": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "boolean"
+                    },
+                    "description": "Map of instance-supported authentication backend names to enabled flags; at least one must remain enabled."
+                  },
+                  "avatar_changes_disabled": {
+                    "type": "boolean"
+                  },
+                  "can_access_all_users_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_add_custom_emoji_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_add_subscribers_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_bots_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_groups": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_private_channel_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_public_channel_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_web_public_channel_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_create_write_only_bots_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_delete_any_message_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_delete_own_message_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_invite_users_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_manage_all_groups": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_manage_billing_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_mention_many_users_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_move_messages_between_channels_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_move_messages_between_topics_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_resolve_topics_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_set_delete_message_policy_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_set_topics_policy_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "can_summarize_topics_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "create_multiuse_invite_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "default_avatar_source": {
+                    "type": "string",
+                    "enum": [
+                      "G",
+                      "J"
+                    ]
+                  },
+                  "default_code_block_language": {
+                    "type": "string"
+                  },
+                  "default_language": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "digest_emails_enabled": {
+                    "type": "boolean"
+                  },
+                  "digest_weekday": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "direct_message_initiator_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "direct_message_permission_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "disallow_disposable_email_addresses": {
+                    "type": "boolean"
+                  },
+                  "email_changes_disabled": {
+                    "type": "boolean"
+                  },
+                  "emails_restricted_to_domains": {
+                    "type": "boolean"
+                  },
+                  "enable_guest_user_dm_warning": {
+                    "type": "boolean"
+                  },
+                  "enable_guest_user_indicator": {
+                    "type": "boolean"
+                  },
+                  "enable_read_receipts": {
+                    "type": "boolean"
+                  },
+                  "enable_spectator_access": {
+                    "type": "boolean"
+                  },
+                  "gif_rating_policy": {
+                    "type": "integer"
+                  },
+                  "media_preview_size": {
+                    "type": "integer",
+                    "enum": [
+                      100,
+                      150,
+                      200
+                    ]
+                  },
+                  "inline_image_preview": {
+                    "type": "boolean"
+                  },
+                  "inline_url_embed_preview": {
+                    "type": "boolean"
+                  },
+                  "invite_required": {
+                    "type": "boolean"
+                  },
+                  "jitsi_server_url": {
+                    "type": "string"
+                  },
+                  "message_content_allowed_in_email_notifications": {
+                    "type": "boolean"
+                  },
+                  "message_content_delete_limit_seconds": {
+                    "oneOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "message_content_edit_limit_seconds": {
+                    "oneOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "message_edit_history_visibility_policy": {
+                    "type": "string",
+                    "enum": [
+                      "all",
+                      "moves",
+                      "none"
+                    ]
+                  },
+                  "message_retention_days": {
+                    "oneOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "moderation_request_channel_id": {
+                    "type": "integer"
+                  },
+                  "move_messages_between_streams_limit_seconds": {
+                    "oneOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "move_messages_within_stream_limit_seconds": {
+                    "oneOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "name_changes_disabled": {
+                    "type": "boolean"
+                  },
+                  "new_stream_announcements_stream_id": {
+                    "type": "integer"
+                  },
+                  "org_type": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      10,
+                      20,
+                      30,
+                      35,
+                      40,
+                      50,
+                      60,
+                      70,
+                      80,
+                      90,
+                      100,
+                      1000
+                    ]
+                  },
+                  "require_e2ee_push_notifications": {
+                    "type": "boolean"
+                  },
+                  "require_unique_names": {
+                    "type": "boolean"
+                  },
+                  "send_channel_events_messages": {
+                    "type": "boolean"
+                  },
+                  "send_welcome_emails": {
+                    "type": "boolean"
+                  },
+                  "signup_announcements_stream_id": {
+                    "type": "integer"
+                  },
+                  "string_id": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "topics_policy": {
+                    "type": "string",
+                    "enum": [
+                      "allow_empty_topic",
+                      "disable_empty_topic"
+                    ]
+                  },
+                  "video_chat_provider": {
+                    "type": "integer"
+                  },
+                  "waiting_period_threshold": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "want_advertise_in_communities_directory": {
+                    "type": "boolean"
+                  },
+                  "zulip_update_announcements_stream_id": {
+                    "type": "integer"
+                  },
+                  "welcome_message_custom_text": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "workplace_users_group": {
+                    "type": "object",
+                    "required": [
+                      "new"
+                    ],
+                    "properties": {
+                      "new": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "direct_members",
+                              "direct_subgroups"
+                            ],
+                            "properties": {
+                              "direct_members": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "direct_subgroups": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "old": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "direct_members",
+                                  "direct_subgroups"
+                                ],
+                                "properties": {
+                                  "direct_members": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "direct_subgroups": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              },
+              "encoding": {
+                "allow_message_editing": {
+                  "contentType": "application/json"
+                },
+                "authentication_methods": {
+                  "contentType": "application/json"
+                },
+                "avatar_changes_disabled": {
+                  "contentType": "application/json"
+                },
+                "can_access_all_users_group": {
+                  "contentType": "application/json"
+                },
+                "can_add_custom_emoji_group": {
+                  "contentType": "application/json"
+                },
+                "can_add_subscribers_group": {
+                  "contentType": "application/json"
+                },
+                "can_create_bots_group": {
+                  "contentType": "application/json"
+                },
+                "can_create_groups": {
+                  "contentType": "application/json"
+                },
+                "can_create_private_channel_group": {
+                  "contentType": "application/json"
+                },
+                "can_create_public_channel_group": {
+                  "contentType": "application/json"
+                },
+                "can_create_web_public_channel_group": {
+                  "contentType": "application/json"
+                },
+                "can_create_write_only_bots_group": {
+                  "contentType": "application/json"
+                },
+                "can_delete_any_message_group": {
+                  "contentType": "application/json"
+                },
+                "can_delete_own_message_group": {
+                  "contentType": "application/json"
+                },
+                "can_invite_users_group": {
+                  "contentType": "application/json"
+                },
+                "can_manage_all_groups": {
+                  "contentType": "application/json"
+                },
+                "can_manage_billing_group": {
+                  "contentType": "application/json"
+                },
+                "can_mention_many_users_group": {
+                  "contentType": "application/json"
+                },
+                "can_move_messages_between_channels_group": {
+                  "contentType": "application/json"
+                },
+                "can_move_messages_between_topics_group": {
+                  "contentType": "application/json"
+                },
+                "can_resolve_topics_group": {
+                  "contentType": "application/json"
+                },
+                "can_set_delete_message_policy_group": {
+                  "contentType": "application/json"
+                },
+                "can_set_topics_policy_group": {
+                  "contentType": "application/json"
+                },
+                "can_summarize_topics_group": {
+                  "contentType": "application/json"
+                },
+                "create_multiuse_invite_group": {
+                  "contentType": "application/json"
+                },
+                "digest_emails_enabled": {
+                  "contentType": "application/json"
+                },
+                "digest_weekday": {
+                  "contentType": "application/json"
+                },
+                "direct_message_initiator_group": {
+                  "contentType": "application/json"
+                },
+                "direct_message_permission_group": {
+                  "contentType": "application/json"
+                },
+                "disallow_disposable_email_addresses": {
+                  "contentType": "application/json"
+                },
+                "email_changes_disabled": {
+                  "contentType": "application/json"
+                },
+                "emails_restricted_to_domains": {
+                  "contentType": "application/json"
+                },
+                "enable_guest_user_dm_warning": {
+                  "contentType": "application/json"
+                },
+                "enable_guest_user_indicator": {
+                  "contentType": "application/json"
+                },
+                "enable_read_receipts": {
+                  "contentType": "application/json"
+                },
+                "enable_spectator_access": {
+                  "contentType": "application/json"
+                },
+                "gif_rating_policy": {
+                  "contentType": "application/json"
+                },
+                "media_preview_size": {
+                  "contentType": "application/json"
+                },
+                "inline_image_preview": {
+                  "contentType": "application/json"
+                },
+                "inline_url_embed_preview": {
+                  "contentType": "application/json"
+                },
+                "invite_required": {
+                  "contentType": "application/json"
+                },
+                "jitsi_server_url": {
+                  "contentType": "application/json"
+                },
+                "message_content_allowed_in_email_notifications": {
+                  "contentType": "application/json"
+                },
+                "message_content_delete_limit_seconds": {
+                  "contentType": "application/json"
+                },
+                "message_content_edit_limit_seconds": {
+                  "contentType": "application/json"
+                },
+                "message_retention_days": {
+                  "contentType": "application/json"
+                },
+                "moderation_request_channel_id": {
+                  "contentType": "application/json"
+                },
+                "move_messages_between_streams_limit_seconds": {
+                  "contentType": "application/json"
+                },
+                "move_messages_within_stream_limit_seconds": {
+                  "contentType": "application/json"
+                },
+                "name_changes_disabled": {
+                  "contentType": "application/json"
+                },
+                "new_stream_announcements_stream_id": {
+                  "contentType": "application/json"
+                },
+                "org_type": {
+                  "contentType": "application/json"
+                },
+                "require_e2ee_push_notifications": {
+                  "contentType": "application/json"
+                },
+                "require_unique_names": {
+                  "contentType": "application/json"
+                },
+                "send_channel_events_messages": {
+                  "contentType": "application/json"
+                },
+                "send_welcome_emails": {
+                  "contentType": "application/json"
+                },
+                "signup_announcements_stream_id": {
+                  "contentType": "application/json"
+                },
+                "video_chat_provider": {
+                  "contentType": "application/json"
+                },
+                "waiting_period_threshold": {
+                  "contentType": "application/json"
+                },
+                "want_advertise_in_communities_directory": {
+                  "contentType": "application/json"
+                },
+                "zulip_update_announcements_stream_id": {
+                  "contentType": "application/json"
+                },
+                "workplace_users_group": {
+                  "contentType": "application/json"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON result with changed settings; server determines allowed fields and roles."
+          }
+        },
+        "x-thinkhome": {
+          "stability": "undocumented",
+          "authentication": "zulip_api_key",
+          "role_policy": "require_realm_admin; field-specific owner, plan, group access and instance policy checks",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "handler": "zerver.views.realm.update_realm",
+          "evidence": [
+            "zerver/views/realm.py:106-583",
+            "zerver/lib/user_groups.py:40-43",
+            "zerver/lib/types.py:159-162",
+            "zerver/models/realms.py:80-176",
+            "zerver/actions/realm_settings.py:369-383",
+            "zerver/lib/rest.py:117-210"
+          ],
+          "side_effects": [
+            "Updates organization security, permissions, branding text, retention, channels and other settings.",
+            "Retention changes may cause future deletion; do not automatically retry.",
+            "Subdomain changes apply only to eligible demo organizations; may change organization URL.",
+            "No promise of atomic rollback across all field updates."
+          ],
+          "safe_read": false,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3",
+          "owner_only_parameters": [
+            "authentication_methods",
+            "message_retention_days",
+            "invite_required",
+            "create_multiuse_invite_group",
+            "can_create_groups",
+            "can_invite_users_group",
+            "can_manage_all_groups",
+            "can_manage_billing_group",
+            "emails_restricted_to_domains",
+            "disallow_disposable_email_addresses",
+            "waiting_period_threshold",
+            "string_id"
+          ],
+          "validation_notes": [
+            "Language/provider names and IDs depend on server configuration.",
+            "Special retention/timeout strings are checked upstream.",
+            "Group old value enables conflict detection; group permissions validated upstream.",
+            "push_notifications_enabled and its end timestamp are explicitly not accepted by this handler."
+          ]
+        }
+      }
+    },
+    "/realm/subdomain/{subdomain}": {
+      "get": {
+        "operationId": "check-subdomain-available",
+        "summary": "Check organization subdomain availability",
+        "security": [],
+        "parameters": [
+          {
+            "name": "subdomain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON msg contains available or validation reason."
+          }
+        },
+        "x-thinkhome": {
+          "authentication": "none",
+          "role_policy": "public",
+          "stability": "undocumented",
+          "handler": "zerver.views.realm.check_subdomain_available",
+          "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+          "evidence": [
+            "zproject/urls.py:317",
+            "zerver/views/realm.py:650-657"
+          ],
+          "side_effects": [],
+          "safe_read": true,
+          "schema_review": "source-reviewed",
+          "integration_status": "not-tested",
+          "feature_level": "unknown; audited on 12.3",
+          "implicit_methods": [
+            "HEAD"
+          ]
+        }
+      }
     }
-  }
+  },
+  "parameter_additions": [
+    {
+      "path": "/messages",
+      "method": "post",
+      "media_type": "application/x-www-form-urlencoded",
+      "properties": {
+        "forged": {
+          "type": "string",
+          "description": "Legacy values yes/true enable forged mode; requires existing can_forge_sender capability."
+        },
+        "sender": {
+          "type": "string",
+          "description": "Sender email; requires existing can_forge_sender capability and Zulip recipient access checks."
+        },
+        "time": {
+          "type": "number",
+          "description": "JSON-encoded timestamp; forwarded to upstream forged timestamp handling."
+        },
+        "widget_content": {
+          "type": "string",
+          "description": "Widget content encoded as text as expected by Zulip widget handling."
+        }
+      },
+      "encoding": {
+        "time": {
+          "contentType": "application/json"
+        }
+      },
+      "aliases": {
+        "subject": "topic"
+      },
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/lib/typed_endpoint.py:109-113",
+          "zerver/lib/typed_endpoint.py:514-533",
+          "zerver/views/message_send.py:30-139"
+        ],
+        "notes": "topic and deprecated subject are mutually exclusive.",
+        "integration_status": "not-tested",
+        "permission_notes": "can_forge_sender is a separate existing Zulip capability, not automatic realm-admin authority. Authentication always remains the caller; MCP never grants the capability or substitutes credentials."
+      }
+    },
+    {
+      "path": "/messages/{message_id}",
+      "method": "patch",
+      "media_type": "application/x-www-form-urlencoded",
+      "properties": {},
+      "encoding": {},
+      "aliases": {
+        "subject": "topic"
+      },
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/lib/typed_endpoint.py:109-113",
+          "zerver/lib/typed_endpoint.py:514-533"
+        ],
+        "notes": "topic and deprecated subject are mutually exclusive.",
+        "integration_status": "not-tested"
+      }
+    },
+    {
+      "path": "/scheduled_messages",
+      "method": "post",
+      "media_type": "application/x-www-form-urlencoded",
+      "properties": {},
+      "encoding": {},
+      "aliases": {
+        "subject": "topic"
+      },
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/lib/typed_endpoint.py:109-113",
+          "zerver/lib/typed_endpoint.py:514-533"
+        ],
+        "notes": "topic and deprecated subject are mutually exclusive.",
+        "integration_status": "not-tested"
+      }
+    },
+    {
+      "path": "/scheduled_messages/{scheduled_message_id}",
+      "method": "patch",
+      "media_type": "application/x-www-form-urlencoded",
+      "properties": {},
+      "encoding": {},
+      "aliases": {
+        "subject": "topic"
+      },
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/lib/typed_endpoint.py:109-113",
+          "zerver/lib/typed_endpoint.py:514-533"
+        ],
+        "notes": "topic and deprecated subject are mutually exclusive.",
+        "integration_status": "not-tested"
+      }
+    },
+    {
+      "path": "/typing",
+      "method": "post",
+      "media_type": "application/x-www-form-urlencoded",
+      "properties": {},
+      "encoding": {},
+      "aliases": {
+        "subject": "topic"
+      },
+      "metadata": {
+        "source_commit": "b31982251ff82d0b02e59f63ad21f19204e37aea",
+        "evidence": [
+          "zerver/lib/typed_endpoint.py:109-113",
+          "zerver/lib/typed_endpoint.py:514-533",
+          "zerver/views/typing.py:28-76"
+        ],
+        "notes": "topic and deprecated subject are mutually exclusive.",
+        "integration_status": "not-tested"
+      }
+    }
+  ]
 }

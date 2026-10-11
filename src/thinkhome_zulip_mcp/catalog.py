@@ -73,6 +73,27 @@ def load_document() -> dict[str, Any]:
             if method in destination:
                 raise ValueError(f"Overlay overwrites an upstream operation: {path}")
             destination[method] = definition
+    for addition in overlays.get("parameter_additions", []):
+        definition = document["paths"][addition["path"]][addition["method"]]
+        body = deepcopy(resolve_reference(document, definition["requestBody"]))
+        content = body["content"][addition["media_type"]]
+        schema = deepcopy(resolve_reference(document, content["schema"]))
+        properties = schema["properties"]
+        for name, value in addition["properties"].items():
+            if name in properties:
+                raise ValueError(f"Parameter overlay overwrites upstream input: {name}")
+            properties[name] = value
+        for alias, canonical in addition["aliases"].items():
+            if alias in properties:
+                raise ValueError(f"Parameter alias overwrites upstream input: {alias}")
+            properties[alias] = deepcopy(properties[canonical])
+            schema.setdefault("allOf", []).append(
+                {"not": {"required": [alias, canonical]}}
+            )
+        content["schema"] = schema
+        content.setdefault("encoding", {}).update(addition["encoding"])
+        definition["requestBody"] = body
+        definition["x-thinkhome-parameter-audit"] = addition["metadata"]
     return document
 
 
@@ -89,3 +110,28 @@ def load_catalog() -> dict[str, Operation]:
             raise ValueError(f"Stale catalog exclusion: {path}")
         del document["paths"][path]
     return catalog_from_document(document, source_commit=provenance["stable_commit"])
+
+
+def resolve_reference(
+    document: dict[str, Any], value: dict[str, Any]
+) -> dict[str, Any]:
+    """Resolve an OpenAPI Reference Object using only this pinned document."""
+    seen = set()
+    while "$ref" in value:
+        ref = value["$ref"]
+        if not isinstance(ref, str) or not ref.startswith("#/"):
+            raise ValueError("Only local OpenAPI references are allowed")
+        if ref in seen:
+            raise ValueError(f"Cyclic OpenAPI reference: {ref}")
+        seen.add(ref)
+        target: Any = document
+        try:
+            for part in ref[2:].split("/"):
+                key = part.replace("~1", "/").replace("~0", "~")
+                target = target[key]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"Missing OpenAPI reference: {ref}") from exc
+        if not isinstance(target, dict):
+            raise ValueError(f"OpenAPI reference is not an object: {ref}")
+        value = target
+    return value

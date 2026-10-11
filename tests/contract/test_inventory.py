@@ -36,3 +36,73 @@ def test_release_coverage_gate_rejects_pending_audit():
     )
     assert result.returncode == 1
     assert "audit incomplete" in result.stderr.lower()
+
+
+def test_every_core_rest_route_has_catalog_metadata():
+    import re
+
+    from thinkhome_zulip_mcp.catalog import load_catalog
+
+    data = ROOT / "src/thinkhome_zulip_mcp/data"
+    inventory = json.loads((data / "routes.json").read_text())
+    operations = {(op.method, op.path) for op in load_catalog().values()}
+    missing = []
+    for route in inventory["routes"]:
+        if (route["source_file"], route["group"]) != (
+            "zproject/urls.py",
+            "v1_api_and_json_patterns",
+        ) or route["method"] is None:
+            continue
+        path = "/" + re.sub(r"<(?:\w+:)?([^>]+)>", r"{\1}", route["pattern"])
+        if (route["method"], path) not in operations:
+            missing.append((route["method"], path))
+    assert not missing, missing
+
+
+def test_every_core_typed_handler_parameter_is_accounted_for():
+    import re
+
+    from thinkhome_zulip_mcp.catalog import (
+        load_catalog,
+        load_document,
+        resolve_reference,
+    )
+
+    data = ROOT / "src/thinkhome_zulip_mcp/data"
+    inventory = json.loads((data / "routes.json").read_text())
+    operations = {(op.method, op.path): op for op in load_catalog().values()}
+    document = load_document()
+    missing = []
+    for route in inventory["routes"]:
+        if (route["source_file"], route["group"]) != (
+            "zproject/urls.py",
+            "v1_api_and_json_patterns",
+        ) or route["method"] is None:
+            continue
+        path = "/" + re.sub(r"<(?:\w+:)?([^>]+)>", r"{\1}", route["pattern"])
+        operation = operations[(route["method"], path)]
+        names = {
+            resolve_reference(document, p)["name"]
+            for p in (
+                operation.path_parameters + operation.definition.get("parameters", [])
+            )
+        }
+        body = resolve_reference(document, operation.definition.get("requestBody", {}))
+        for content in body.get("content", {}).values():
+            names.update(
+                resolve_reference(document, content["schema"]).get("properties", {})
+            )
+        for parameter in inventory["handlers"][route["handler"]]["parameters"]:
+            if parameter["kind"] != "keyword_only":
+                continue
+            annotation = parameter["annotation"] or ""
+            name = parameter["name"]
+            alias = re.search(r"ApiParamConfig\('([^']+)'", annotation)
+            if alias and "path_only=True" not in annotation:
+                name = alias.group(1)
+            if annotation == "OptionalTopic":
+                name = "topic"
+                assert "subject" in names
+            if name not in names:
+                missing.append((operation.operation_id, name))
+    assert not missing, missing

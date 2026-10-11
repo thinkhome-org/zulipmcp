@@ -11,12 +11,13 @@ select the license for our own implementation.
 ## Current evidence
 
 - 158 upstream schema operations after three documentation-only exclusions, plus
-  3 source-reviewed additions (two settings aliases and onboarding).
+  29 source-reviewed additions, including the full core REST gap and public
+  subdomain availability.
 - 0 executable operations, 0 wire-contract-tested operations, 0 integration-tested
   operations. Catalog tests verify schema retention and duplicate/missing ID checks.
 - The three documentation-only paths are listed in `data/exclusions.json`, with
   evidence from upstream `zerver/tests/test_openapi.py:241-249`.
-- 161 is **not** a claim about total application API coverage. The schema includes
+- 187 is **not** a claim about total application API coverage. The schema includes
   development/bouncer APIs and does not describe all application operations.
 
 ## Outstanding audit
@@ -67,3 +68,38 @@ operations must block a complete release. A green ordinary check is not that gat
 Overlay source references, side effects and unknown feature levels are stored in
 `data/overlays.json`. No integration verification is claimed. The onboarding
 operation can schedule a welcome-bot reminder; it is not classified as read-only.
+
+## Core route and parameter audit update
+
+All 177 explicit methods declared with `rest_path` in the pinned main
+`v1_api_and_json_patterns` now have catalog entries. Its direct public subdomain
+GET route has a separate schema as well. Contract tests reconcile the core typed
+handler keyword parameters against resolved OpenAPI references plus overlays.
+This is metadata/input accounting, not HTTP serialization or integration coverage.
+
+The 28 initial core REST gaps are now represented: realm settings (71 inputs),
+branding, bots, profile fields, deactivation, widget submessages, slash commands,
+message summaries, avatars, onboarding, settings aliases, default channel groups,
+Zoom calls and export deletion. Separate source-backed additions cover the four
+undocumented send-message parameters and the `subject` alias on all five handlers
+using `OptionalTopic`, including typing notifications.
+
+Important distinctions retained in schemas and metadata:
+
+- Realm admin is insufficient for owner-only organization fields.
+- `sender`/`forged` require the caller's pre-existing `can_forge_sender` capability;
+  no credentials are substituted and the MCP never grants that capability.
+- Bot creation/listing can return secrets. These outputs must not be logged.
+- Image reads return redirects; outgoing credentials must never follow them
+  across origins. Uploads require multipart; bot updates also accept a form
+  when no avatar is supplied.
+- Message summary uses GET but may spend AI credits, so it is not retry-safe.
+- `topic` and legacy `subject` are mutually exclusive, not last-value-wins.
+- Deactivation's JSON nullable delay differs from onboarding's optional but
+  non-nullable JSON delay.
+
+Still pending: non-core/included routes (SCIM, optional components, files and
+session-specific routes), runtime/dynamic route expansion, global wrapper inputs,
+response schemas, all execution and integration checks. Generated route records
+remain `pending` until their complete final classification is recorded. Do not
+interpret source-reviewed input metadata as a completed route audit.
