@@ -157,6 +157,7 @@ async def test_http_queue_handles_cannot_cross_users_and_revocation_applies(
             channel_policy=ChannelPolicy(jd_enabled=filtered),
             transport=httpx.MockTransport(upstream),
         ),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),

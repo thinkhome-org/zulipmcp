@@ -66,17 +66,23 @@ concurrent registration/poll limits, cancellation, malformed responses, delete
 retry, bounded shutdown, actual SDK tool dispatch, HTTP token revocation and
 method/path/form/query encoding against an HTTP fixture.
 
-This is the event-queue foundation. The reference `listen` workflow still needs
-session context, catch-up, automatic subscription, listening/dismiss reactions,
-renewable long waits, progress notifications and interrupt-file support. Live
-Zulip event delivery and the complete reference parity gate remain unverified.
+The higher-level [conversation workflow](conversations.md) adds session context,
+catch-up, automatic subscription, listening/dismiss reactions, renewed queues,
+progress callbacks and local interrupts. Loopback TCP tests verify progress delivery
+with the official MCP client and a simulated Zulip upstream. Live Zulip events
+and complete reference parity remain unverified.
 
-## Channel-filtered message queues
+## Channel-filtered message and reaction queues
 
-When channel policies are enabled, explicitly request `event_types=["message"]`
-(and, if supplied, a `fetch_event_types` subset of `message`). Registration removes
-unrelated initial state. Polling checks each message's channel metadata under the
-caller and applies DM rules; heartbeat events retain only ID/type. Other event
+When channel policies are enabled, explicitly request a subset of `message` and
+`reaction` in `event_types` and, if supplied, `fetch_event_types`. Registration
+removes unrelated initial state. Polling checks each message's channel metadata
+under the caller and applies DM rules; heartbeat events retain only ID/type.
+Reaction events require a current read of their target message through the same
+caller and channel policy. Zulip queue narrows do not restrict reactions, so the
+narrow alone is never treated as authorization. Reactions on policy-denied
+messages are omitted while preserving the original acknowledgement cursor.
+Malformed events or failed target lookups return no partial batch. Other event
 types remain unsupported in this mode.
 
 An empty filtered batch can still advance `next_event_id`. Acknowledge that cursor

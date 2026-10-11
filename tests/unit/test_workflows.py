@@ -198,3 +198,56 @@ async def test_history_wire_encoding_and_upstream_error():
     )
     assert result.status_code == 403
     assert result.error["code"] == "upstream_error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("direction", ["older", "newer"])
+async def test_history_date_anchor_includes_boundary_with_bounded_page(direction):
+    from thinkhome_zulip_mcp.workflows import history_page
+
+    executor = AsyncMock()
+    executor.channel_policy = ChannelPolicy()
+    executor.execute.return_value = OperationResult(
+        "date",
+        data={
+            "messages": [{"id": 9}, {"id": 10}],
+            "found_oldest": False,
+            "found_newest": False,
+        },
+    )
+    result = await history_page(
+        executor,
+        CALLER,
+        [],
+        direction=direction,
+        limit=2,
+        anchor_date="2026-10-11T12:00:00+02:00",
+        apply_markdown=False,
+    )
+    assert not result.error
+    args = executor.execute.await_args.args[2]
+    assert args["anchor"] == "date"
+    assert args["anchor_date"] == "2026-10-11T10:00:00+00:00"
+    assert args["include_anchor"] is True
+    assert args["num_before"] + args["num_after"] == 1
+    assert args["apply_markdown"] is False
+    assert result.data["next_cursor"] == (9 if direction == "older" else 10)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"anchor_date": "bad"},
+        {"anchor_date": 1},
+        {"anchor_date": "2020-01-01", "cursor": 10},
+        {"apply_markdown": 1},
+    ],
+)
+async def test_history_rejects_invalid_date_options_before_network(kwargs):
+    from thinkhome_zulip_mcp.workflows import history_page
+
+    executor = AsyncMock()
+    result = await history_page(executor, CALLER, [], **kwargs)
+    assert result.error["code"] == "invalid_history_request"
+    executor.execute.assert_not_called()

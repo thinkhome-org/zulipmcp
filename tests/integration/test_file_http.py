@@ -24,6 +24,7 @@ async def test_authenticated_file_roundtrip_isolation_limits_and_cleanup(tmp_pat
             store, AuthConfig("https://mcp.example/mcp", "https://zulip.example")
         ),
         Executor(files=files),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),
@@ -109,6 +110,7 @@ async def test_download_tool_stages_owned_bytes_for_http_retrieval(tmp_path):
         Executor(
             files=FileStore(parent=tmp_path), transport=httpx.MockTransport(upstream)
         ),
+        json_response=True,
     )
     async with (
         app.router.lifespan_context(app),

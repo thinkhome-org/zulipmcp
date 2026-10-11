@@ -68,12 +68,19 @@ The windborne compatibility profile's default-private-denial remains pending.
 | Operations | Enforcement |
 |---|---|
 | `send-message` | Resolve and validate channel metadata, enforce read/write rules, send to the checked numeric ID; apply DM restriction for direct messages. |
-| `get-streams` | Validate each channel and filter the list under the current caller. |
+| `get-streams`, `get-subscriptions` | Validate each channel and filter the list under the current caller, retaining allowed subscription settings. |
+| `get-user-channels` | Resolve each returned channel ID under the acting caller, filter by current metadata and fail the complete result if any lookup cannot be validated. |
 | `get-stream-id`, `get-stream-by-id` | Check current channel name/privacy before returning metadata or ID. |
 | `get-messages` | Filter each page using current per-caller channel metadata and the DM rule; preserve traversal bounds for pagination. |
 | `get-message` | Validate exact message ID, check current channel metadata or the DM rule before returning content. |
 | `update-message`, `delete-message`, `add-reaction`, `remove-reaction` | Validate input, check source-message access and source-channel write rules; moves also check the destination. Read-only denials precede metadata requests. |
 | `get-stream-topics`, `get-subscribers`, `get-subscription-status` | Check channel metadata before fetching the requested data. |
+
+Fourteen [user/profile/presence/group and own-preference operations](user-discovery.md)
+are separately audited as independent of channel content and remain available.
+Status and mute writes are still denied by read-only mode. They retain upstream profile and email
+visibility checks; free-form profile text and message-existence metadata are not
+redacted.
 
 While a channel policy is active, all other operations return
 `channel_policy_not_supported` without making an upstream call. This temporary
