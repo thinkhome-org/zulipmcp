@@ -7,16 +7,19 @@ name = "thinkhome-zulip-mcp"
 version = "0.1.0.dev0"
 description = "Auditable Zulip application API access through MCP"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND Apache-2.0"
+license-files = ["LICENSE", "src/thinkhome_zulip_mcp/data/*LICENSE", "src/thinkhome_zulip_mcp/data/*NOTICE", "src/thinkhome_zulip_mcp/data/THIRD-PARTY-NOTICES.md"]
 requires-python = ">=3.12"
 dependencies = [
     "cryptography>=50.0.2",
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
     "mcp>=2.3.0,<3",
+    "pyjwt[crypto]>=2.15.1",
     "pyyaml>=6.0.3",
     "referencing>=0.37.0",
+    "starlette>=1.7.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
@@ -30,6 +33,7 @@ dev = [
     "types-pyyaml>=6.0.12.20260906",
     "types-jsonschema>=4.26.0.20261006",
     "pytest-asyncio>=1.4.0",
+    "httpx2>=2.13.1",
 ]
 
 [tool.ruff]
@@ -44,3 +48,14 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "src", "tests", "scripts", "docs", ".github", ".gitignore", ".gitleaksignore",
+    "AGENTS.md", "CONTRIBUTING.md", "README.md", "LICENSE", "pyproject.toml", "uv.lock",
+]
+exclude = ["**/__pycache__/**", "**/*.pyc", "**/.venv/**", "**/.superpowers/**"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/thinkhome_zulip_mcp"]
+exclude = ["**/__pycache__/**", "**/*.pyc"]
