@@ -332,6 +332,77 @@ class Executor:
             "unmute-user",
         }:
             return await self._execute(principal, operation_id, arguments)
+        if operation_id == "check-messages-match-narrow":
+            try:
+                self._prepare(self.catalog[operation_id], arguments)
+                ids = arguments["msg_ids"]
+                if len(ids) > 1000 or any(
+                    type(mid) is not int or mid < 1 for mid in ids
+                ):
+                    raise ValueError("Expected at most 1000 positive message IDs")
+            except (ValueError, TypeError) as exc:
+                return OperationResult(
+                    str(uuid4()),
+                    error={"code": "invalid_arguments", "message": str(exc)},
+                )
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            matches = (
+                result.data.get("messages") if isinstance(result.data, dict) else None
+            )
+            requested_match_ids = {str(mid) for mid in ids}
+            if not isinstance(matches, dict) or any(
+                key not in requested_match_ids
+                or not isinstance(snippet, dict)
+                or any(
+                    not isinstance(snippet.get(field), str)
+                    for field in ("match_content", "match_subject")
+                )
+                for key, snippet in matches.items()
+            ):
+                return replace(
+                    result, data=None, error={"code": "invalid_upstream_response"}
+                )
+            visible_matches = {}
+            try:
+                async with asyncio.timeout(30):
+                    for key, snippet in matches.items():
+                        mid = int(key)
+                        access = await self.execute(
+                            principal,
+                            "get-messages",
+                            {
+                                "anchor": key,
+                                "include_anchor": True,
+                                "num_before": 0,
+                                "num_after": 0,
+                                "narrow": [{"operator": "id", "operand": mid}],
+                            },
+                        )
+                        if access.error:
+                            return replace(access, data=None)
+                        messages = access.data["messages"]
+                        if len(messages) > 1 or any(
+                            message["id"] != mid for message in messages
+                        ):
+                            return replace(
+                                result,
+                                data=None,
+                                error={"code": "invalid_upstream_response"},
+                            )
+                        if messages:
+                            visible_matches[key] = {
+                                field: snippet[field]
+                                for field in ("match_content", "match_subject")
+                            }
+            except TimeoutError:
+                return replace(
+                    result, data=None, error={"code": "channel_policy_lookup_timeout"}
+                )
+            return replace(
+                result, data={"result": "success", "messages": visible_matches}
+            )
         if operation_id == "subscribe":
             if self.read_only:
                 return await self._execute(principal, operation_id, arguments)
