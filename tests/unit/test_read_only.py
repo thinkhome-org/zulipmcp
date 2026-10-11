@@ -68,6 +68,8 @@ async def test_read_only_discovery_and_batch_cannot_bypass_policy():
         "zulip_execute",
         "zulip_batch",
         "zulip_history",
+        "zulip_set_context",
+        "zulip_end_session",
         "zulip_get_message",
         "zulip_get_users",
         "zulip_get_user",

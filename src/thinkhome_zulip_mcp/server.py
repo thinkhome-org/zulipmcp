@@ -2,18 +2,19 @@
 
 import asyncio
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Coroutine
 from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict, replace
 from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.routes import build_resource_metadata_url, cors_middleware
 from mcp.server.auth.settings import AuthSettings
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
@@ -25,6 +26,7 @@ from starlette.routing import Route
 
 from thinkhome_zulip_mcp.auth import Authenticator
 from thinkhome_zulip_mcp.catalog import resolve_reference
+from thinkhome_zulip_mcp.conversations import Conversations
 from thinkhome_zulip_mcp.downloads import download_file
 from thinkhome_zulip_mcp.events import EventQueues
 from thinkhome_zulip_mcp.executor import Executor, OperationResult, Principal
@@ -76,9 +78,15 @@ def create_server(
     *,
     authenticator: Authenticator | None = None,
     download_origins: tuple[str, ...] = (),
+    conversation_options: dict[str, Any] | None = None,
 ) -> MCPServer[Any]:
     if (principal is None) == (authenticator is None):
         raise ValueError("Configure either a stdio principal or HTTP authenticator")
+
+    if authenticator is not None:
+        for option in ("interrupt_file", "workspace_path"):
+            if (conversation_options or {}).get(option) is not None:
+                raise ValueError(f"{option} is supported only in stdio mode")
 
     def current_principal() -> Principal:
         if principal is not None:
@@ -110,13 +118,63 @@ def create_server(
         except ValueError as exc:
             raise ToolError(str(exc)) from exc
 
+    initial_stream = os.environ.get("SESSION_STREAM") if principal is not None else None
+    initial_topic = os.environ.get("SESSION_TOPIC") if principal is not None else None
+    if (initial_stream is None) != (initial_topic is None):
+        raise ValueError("SESSION_STREAM and SESSION_TOPIC must both be configured")
+    if initial_stream is not None and not initial_stream.strip():
+        raise ValueError("SESSION_STREAM must not be blank")
+    trigger = None
+    if initial_stream is not None and os.environ.get("TRIGGER_MESSAGE_ID"):
+        trigger = int(os.environ["TRIGGER_MESSAGE_ID"])
+        if trigger <= 0:
+            raise ValueError("TRIGGER_MESSAGE_ID must be positive")
+    conversation_options = dict(conversation_options or {})
+    if principal is not None and os.environ.get("WORKSPACE_PATH"):
+        conversation_options.setdefault("workspace_path", os.environ["WORKSPACE_PATH"])
     queues = EventQueues(executor)
+    conversations = Conversations(
+        executor,
+        queues=queues,
+        message_max_length=message_max_length,
+        **(conversation_options or {}),
+    )
+
+    initial_result: OperationResult | None = None
+    initial_lock = asyncio.Lock()
+
+    async def automatic_context() -> OperationResult:
+        nonlocal initial_result
+        if initial_stream is None or initial_topic is None:
+            raise ToolError("No automatic context configured; supply stream and topic")
+        async with initial_lock:
+            if initial_result is None:
+                initial_result = await conversations.set_context(
+                    current_principal,
+                    initial_stream.strip(),
+                    initial_topic,
+                    num_messages=1,
+                    trigger_message_id=trigger,
+                )
+            return initial_result
+
+    async def conversation_handle(handle: str | None) -> str:
+        if handle is not None:
+            return handle
+        result = await automatic_context()
+        if result.error:
+            raise ToolError(
+                "Automatic context failed; inspect zulip_set_context result"
+            )
+        return str(result.data["handle"])
 
     @asynccontextmanager
     async def lifespan(_: MCPServer[Any]) -> AsyncIterator[dict[str, Any]]:
         files = executor.files
         task = asyncio.create_task(files.cleanup_loop()) if files else None
         try:
+            if initial_stream is not None:
+                await automatic_context()
             yield {}
         finally:
             try:
@@ -126,7 +184,10 @@ def create_server(
                         await task
             finally:
                 try:
-                    await queues.close()
+                    try:
+                        await conversations.close()
+                    finally:
+                        await queues.close()
                 finally:
                     if files:
                         files.close()
@@ -555,6 +616,97 @@ def create_server(
         open_world_hint=True,
     )
 
+    @server.tool(annotations=queue_annotations)
+    async def zulip_set_context(
+        stream: str | int | None = None,
+        topic: str | None = None,
+        num_messages: Annotated[int, Field(ge=0, le=200)] = 20,
+        trigger_message_id: Annotated[int, Field(ge=1)] | None = None,
+    ) -> CallToolResult:
+        """Create an owned conversation, or omit both fields for stdio auto-context."""
+        if stream is None and topic is None:
+            return _tool_result(
+                await automatic_context(), "Automatic conversation context."
+            )
+        if stream is None or topic is None:
+            raise ToolError("Supply both stream and topic")
+        return _tool_result(
+            await conversations.set_context(
+                current_principal,
+                stream,
+                topic,
+                num_messages=num_messages,
+                trigger_message_id=trigger_message_id,
+            ),
+            "Conversation initialized; inspect history and warnings.",
+        )
+
+    async def run_conversation(
+        call: Coroutine[Any, Any, OperationResult],
+    ) -> OperationResult:
+        # Ending a conversation must not cancel the SDK's enclosing session task.
+        task = asyncio.create_task(call)
+        try:
+            return await task
+        except asyncio.CancelledError:
+            current = asyncio.current_task()
+            if current is not None and current.cancelling():
+                raise
+            return OperationResult(
+                str(uuid4()), error={"code": "conversation_cancelled"}
+            )
+
+    @server.tool(annotations=message_write)
+    async def zulip_reply(content: str, handle: str | None = None) -> CallToolResult:
+        """Catch up and reply; omit handle to use stdio auto-context."""
+        return _tool_result(
+            await run_conversation(
+                conversations.reply(
+                    current_principal, await conversation_handle(handle), content
+                )
+            ),
+            "Reply sent; inspect missed_messages and warnings.",
+        )
+
+    @server.tool(annotations=queue_annotations)
+    async def zulip_listen(
+        ctx: Context,
+        handle: str | None = None,
+        timeout_hours: Annotated[float, Field(gt=0, le=2)] = 1,
+    ) -> CallToolResult:
+        """Listen with gap indicators; omit handle to use stdio auto-context."""
+
+        async def progress(elapsed: float, total: float) -> None:
+            await ctx.report_progress(progress=elapsed, total=total)
+
+        return _tool_result(
+            await run_conversation(
+                conversations.listen(
+                    current_principal,
+                    await conversation_handle(handle),
+                    timeout_seconds=timeout_hours * 3600,
+                    progress=progress,
+                )
+            ),
+            "Listen finished; inspect messages, timeout and resynchronization fields.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_end_session(
+        handle: str | None = None,
+        message: str = ":wave: Signing off",
+    ) -> CallToolResult:
+        """End a conversation; omit handle for stdio auto-context.
+
+        An empty message means silent exit.
+        """
+        return _tool_result(
+            await conversations.end(
+                current_principal, await conversation_handle(handle), message
+            ),
+            "Conversation ended; inspect warnings.",
+        )
+
     @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
     async def zulip_get_message(
         message_id: Annotated[int, Field(ge=1)],
@@ -810,6 +962,8 @@ def create_server(
 
     if executor.read_only:
         for name in (
+            "zulip_reply",
+            "zulip_listen",
             "zulip_update_status",
             "zulip_manage_user_mute",
             "zulip_send_message",
@@ -833,6 +987,8 @@ def create_http_app(
     executor: Executor | None = None,
     *,
     download_origins: tuple[str, ...] = (),
+    conversation_options: dict[str, Any] | None = None,
+    json_response: bool = False,
 ) -> Starlette:
     executor = executor or Executor()
     if executor.files is None:
@@ -841,6 +997,7 @@ def create_http_app(
         executor=executor,
         authenticator=authenticator,
         download_origins=download_origins,
+        conversation_options=conversation_options,
     )
     resource = urlsplit(authenticator.config.resource_url)
     security = TransportSecuritySettings(
@@ -850,7 +1007,7 @@ def create_http_app(
     )
     app = server.streamable_http_app(
         streamable_http_path=resource.path,
-        json_response=True,
+        json_response=json_response,
         stateless_http=False,
         max_request_body_size=1024 * 1024,
         max_sessions=1000,

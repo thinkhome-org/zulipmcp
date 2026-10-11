@@ -10,10 +10,10 @@ The pinned source registers **27 tools**. Names below identify reference behavio
 
 | Reference tool | Source | ThinkHome parity |
 |---|---|---|
-| `set_context` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L363) | Pending dedicated wrapper and parity tests |
-| `reply` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L400) | Pending dedicated wrapper and parity tests |
-| `listen` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L504) | Pending dedicated wrapper and parity tests |
-| `end_session` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L710) | Pending dedicated wrapper and parity tests |
+| `set_context` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L363) | Implemented with owned handles, trigger validation, stdio automatic context and history; tests in test_conversations.py and test_conversation_tools.py. Full live parity unverified |
+| `reply` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L400) | Implemented with catch-up, explicit pagination, dismiss check, prefix and typing hooks; send-race and uncertain-write regressions covered |
+| `listen` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L504) | Implemented with renewal, catch-up, scoped reactions, public subscription, progress callback and stdio interrupts; loopback network progress and active-listen cancellation verified; live Zulip/two-hour soak unverified |
+| `end_session` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L710) | Implemented with cancellation, farewell, hooks, local markers and cleanup; HTTP cancellation regression covered |
 | `list_streams` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L795) | Pending dedicated wrapper and parity tests |
 | `get_stream_topics` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L824) | Pending dedicated wrapper and parity tests |
 | `get_stream_members` | [definition](https://github.com/windborne/zulipmcp/blob/10b4ef1b9a5c9da5a3f043d1bfa196bfbd2e0d75/zulipmcp/mcp.py#L847) | Pending dedicated wrapper and parity tests |
@@ -50,13 +50,13 @@ Additional public core helpers not re-exported by `__init__.py`: `is_private_str
 
 | Area | Required behavior | Current state |
 |---|---|---|
-| Session | Context/history initialization, trigger anchor, requester identity, automatic environment context, reply catches up before sending, dismiss-before-reply, farewell/duration, automatic typing start after context/reply, configurable suppression with reply-time stop, unconditional idle/exit stop, hooks and exit markers | Pending |
-| Listening | Narrowed real-time queue, catch-up, auto-subscribe when permitted, renewal after expiration with explicit history-gap status, reactions including custom robot_ear, cancellation/dismissal, keepalive/progress, external interrupt file, renewable long waits | Queue foundation implemented; reference listen behavior pending |
+| Session | Context/history initialization, trigger anchor, requester identity, automatic environment context, reply catches up before sending, dismiss-before-reply, farewell/duration, automatic typing start after context/reply, configurable suppression with reply-time stop, unconditional idle/exit stop, hooks and exit markers | Core behaviors implemented; caller isolation and lifecycle fixtures pass. Reference compatibility aliases and real Zulip verification pending |
+| Listening | Narrowed real-time queue, catch-up, auto-subscribe when permitted, renewal after expiration with explicit history-gap status, reactions including custom robot_ear, cancellation/dismissal, keepalive/progress, external interrupt file, renewable long waits | Core workflow implemented with unit/ASGI fixtures; network progress/cancellation verified; two-hour soak and full live parity still pending |
 | Message access | Paginated time/channel/sender/as-of history; before-ID and message-ID context; deduplication; name/email lookup; message links; rendered-message verification; topic resolution and moves | Generic primitives only; high-level parity pending |
-| Formatting | XML-style message/topic formatting, combined consecutive messages, context windows, timestamp/timezone display, reaction summaries, selectable stream fields, safe escaping of untrusted content | Pending |
-| Policies | /nobots and /nb filtering, ignored streams, configurable private/read and write allowlists, custom dismiss reactions, maximum message length including prefixes | Pending |
-| Markdown | Blank lines before tables and bold/link normalization, preserving fenced/indented/inline code; explicit disable setting | Pending |
-| Hooks/config | message_prefix, on_session_end, on_set_context, on_reply, dismiss_emoji, interrupt_file, auto_typing_start; .zuliprc/ZULIP_RC_PATH, timezone/cache/log settings | Pending |
+| Formatting | XML-style message/topic formatting, combined consecutive messages, context windows, timestamp/timezone display, reaction summaries, selectable stream fields, safe escaping of untrusted content | Pure message/topic XML, sender-ID context windows, timezone/range display and reaction summaries implemented. Advanced-search wiring and stream field formatting pending |
+| Policies | /nobots and /nb filtering, ignored streams, configurable private/read and write allowlists, custom dismiss reactions, maximum message length including prefixes | Channel/read-only policies, nobots filtering, custom dismiss reactions and message caps implemented. Ignored streams and complete operation policy coverage pending |
+| Markdown | Blank lines before tables and bold/link normalization, preserving fenced/indented/inline code; explicit disable setting | Implemented and tested, including upstream normalization regression cases and disable setting |
+| Hooks/config | message_prefix, on_session_end, on_set_context, on_reply, dismiss_emoji, interrupt_file, auto_typing_start; .zuliprc/ZULIP_RC_PATH, timezone/cache/log settings | Conversation hooks, prefix, dismiss config, interrupt, typing, timezone and local markers implemented. zuliprc/cache/log compatibility pending |
 | Transports | stdio and authenticated legacy SSE in addition to the existing Streamable HTTP transport | stdio/HTTP implemented; SSE pending |
 | Direct launcher | Claude and Codex, one foreground session, custom binary/workdir/prompt/config, trigger/requester context, renewable timeout, passthrough flags, dry-run, explicit permission modes | Pending |
 | Mention listener | Claude, Codex and OpenCode; one live session per stream/topic, mention dispatch, public subscription, private membership checks, eyes reaction, lifecycle/log management | Pending |
@@ -75,3 +75,17 @@ Hermes gateway/plugin behavior is explicitly excluded by the user. No other feat
 - Add a parity manifest/test matrix with evidence for every tool, exported library capability, listener/backend and behavioral row before claiming parity. Include upstream regression scenarios (normalization, timezones, interrupt handling, direct launch, automatic typing).
 - Do not count mocked backend command construction as an actual authenticated agent-provider run; publish any external-provider verification limits.
 - Preserve third-party notices if upstream code is reused. This source inventory itself does not relicense upstream code.
+
+## Conversation milestone evidence (working branch)
+
+See [conversation behavior and limitations](conversations.md). The implemented
+scope is backed by `tests/unit/test_conversations.py`,
+`tests/unit/test_message_formatting.py`, `tests/integration/test_conversation_tools.py`
+and `tests/integration/test_http_conversations.py`. Policy dependencies have
+separate typing, subscription and reaction-event executor tests. These fixtures
+simulate Zulip; they do not certify the live upstream API or all reference behavior.
+
+The generic operation catalog still reports `full_coverage=false`. Neither these
+convenience tools nor green CI change the endpoint certification status. A final
+whole-plan review, remaining reference families and live Zulip role tests are
+required before claiming v1.0 complete.

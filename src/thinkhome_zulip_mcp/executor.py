@@ -320,6 +320,7 @@ class Executor:
             "get-user-by-email",
             "get-own-user",
             "get-custom-profile-fields",
+            "get-custom-emoji",
             "get-presence",
             "get-user-presence",
             "get-user-status",
@@ -331,6 +332,54 @@ class Executor:
             "unmute-user",
         }:
             return await self._execute(principal, operation_id, arguments)
+        if operation_id == "subscribe":
+            if self.read_only:
+                return await self._execute(principal, operation_id, arguments)
+            try:
+                self._prepare(self.catalog[operation_id], arguments)
+            except (ValueError, TypeError) as exc:
+                return OperationResult(
+                    str(uuid4()),
+                    error={"code": "invalid_arguments", "message": str(exc)},
+                )
+            targets: dict[str, int] = {}
+            for subscription in arguments["subscriptions"]:
+                name = subscription["name"]
+                resolved = await self.execute(
+                    principal, "get-stream-id", {"stream": name}
+                )
+                if resolved.error:
+                    return resolved
+                channel_id = resolved.data["stream_id"]
+                channel = await self.execute(
+                    principal, "get-stream-by-id", {"stream_id": channel_id}
+                )
+                if channel.error:
+                    return channel
+                metadata = channel.data["stream"]
+                if not self.channel_policy.allows_channel(
+                    metadata["name"], private=metadata["invite_only"], write=True
+                ):
+                    return OperationResult(
+                        str(uuid4()), error={"code": "channel_policy_denied"}
+                    )
+                targets[name] = channel_id
+            result = await self._execute(principal, operation_id, arguments)
+            if result.error:
+                return replace(result, data=None)
+            # Zulip subscribes by name; concurrent renames cannot be made atomic here.
+            for name, channel_id in targets.items():
+                resolved = await self.execute(
+                    principal, "get-stream-id", {"stream": name}
+                )
+                if resolved.error or resolved.data["stream_id"] != channel_id:
+                    return replace(
+                        result,
+                        data=None,
+                        error={"code": "subscription_target_changed"},
+                        uncertain_write=True,
+                    )
+            return result
         if operation_id == "delete-queue":
             result = await self._execute(principal, operation_id, arguments)
             if result.error:
@@ -348,7 +397,8 @@ class Executor:
             requested = arguments.get("event_types")
             initial = arguments.get("fetch_event_types", requested)
             if any(
-                not isinstance(types, list) or any(kind != "message" for kind in types)
+                not isinstance(types, list)
+                or any(kind not in ("message", "reaction") for kind in types)
                 for types in (requested, initial)
             ):
                 return OperationResult(
@@ -436,13 +486,55 @@ class Executor:
                         if event.get("type") == "heartbeat":
                             visible.append({"id": cursor, "type": "heartbeat"})
                             continue
-                        if event.get("type") != "message":
+                        if event.get("type") == "reaction":
+                            if (
+                                event.get("op") not in ("add", "remove")
+                                or type(event.get("message_id")) is not int
+                                or event["message_id"] <= 0
+                                or type(event.get("user_id")) is not int
+                                or event["user_id"] <= 0
+                                or not isinstance(event.get("emoji_name"), str)
+                            ):
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "invalid_events_response"},
+                                )
+                            # Zulip queue narrows do not constrain reaction events.
+                            reaction_target = await self._execute(
+                                principal,
+                                "get-message",
+                                {"message_id": event["message_id"]},
+                            )
+                            if reaction_target.error:
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "channel_policy_lookup_failed"},
+                                )
+                            message = (
+                                reaction_target.data.get("message")
+                                if isinstance(reaction_target.data, dict)
+                                else None
+                            )
+                            if (
+                                not isinstance(message, dict)
+                                or type(message.get("id")) is not int
+                                or message["id"] != event["message_id"]
+                            ):
+                                return replace(
+                                    result,
+                                    data=None,
+                                    error={"code": "invalid_events_response"},
+                                )
+                        elif event.get("type") == "message":
+                            message = event.get("message")
+                        else:
                             return replace(
                                 result,
                                 data=None,
                                 error={"code": "channel_policy_event_not_supported"},
                             )
-                        message = event.get("message")
                         if (
                             not isinstance(message, dict)
                             or type(message.get("id")) is not int
@@ -708,6 +800,7 @@ class Executor:
             )
         if operation_id not in {
             "send-message",
+            "set-typing-status",
             "get-stream-id",
             "get-stream-by-id",
             "get-stream-topics",
@@ -718,7 +811,7 @@ class Executor:
             return OperationResult(
                 str(uuid4()), error={"code": "channel_policy_not_supported"}
             )
-        if self.read_only and operation_id == "send-message":
+        if self.read_only and operation_id in {"send-message", "set-typing-status"}:
             return await self._execute(principal, operation_id, arguments)
         try:
             self._prepare(self.catalog[operation_id], arguments)
@@ -727,20 +820,23 @@ class Executor:
                 str(uuid4()), error={"code": "invalid_arguments", "message": str(exc)}
             )
         denied = OperationResult(str(uuid4()), error={"code": "channel_policy_denied"})
-        if operation_id == "send-message" and arguments["type"] in {
-            "direct",
-            "private",
-        }:
+        if (
+            operation_id == "send-message"
+            and arguments["type"] in {"direct", "private"}
+        ) or (
+            operation_id == "set-typing-status"
+            and arguments.get("type", "direct") == "direct"
+        ):
             if not self.channel_policy.allows_dm():
                 return denied
             return await self._execute(principal, operation_id, arguments)
-        target = arguments[
+        target = arguments.get(
             "to"
             if operation_id == "send-message"
             else "stream"
             if operation_id == "get-stream-id"
             else "stream_id"
-        ]
+        )
         if isinstance(target, list):
             if len(target) != 1:
                 return denied
@@ -769,7 +865,7 @@ class Executor:
         if not self.channel_policy.allows_channel(
             stream["name"],
             private=stream["invite_only"],
-            write=operation_id == "send-message",
+            write=operation_id in {"send-message", "set-typing-status"},
         ):
             return denied
         if operation_id == "get-stream-id":
