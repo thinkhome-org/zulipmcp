@@ -68,12 +68,19 @@ The windborne compatibility profile's default-private-denial remains pending.
 | Operations | Enforcement |
 |---|---|
 | `send-message` | Resolve and validate channel metadata, enforce read/write rules, send to the checked numeric ID; apply DM restriction for direct messages. |
-| `get-streams` | Validate each channel and filter the list under the current caller. |
+| `get-streams`, `get-subscriptions` | Validate each channel and filter the list under the current caller, retaining allowed subscription settings. |
+| `get-user-channels` | Resolve each returned channel ID under the acting caller, filter by current metadata and fail the complete result if any lookup cannot be validated. |
 | `get-stream-id`, `get-stream-by-id` | Check current channel name/privacy before returning metadata or ID. |
 | `get-messages` | Filter each page using current per-caller channel metadata and the DM rule; preserve traversal bounds for pagination. |
 | `get-message` | Validate exact message ID, check current channel metadata or the DM rule before returning content. |
 | `update-message`, `delete-message`, `add-reaction`, `remove-reaction` | Validate input, check source-message access and source-channel write rules; moves also check the destination. Read-only denials precede metadata requests. |
 | `get-stream-topics`, `get-subscribers`, `get-subscription-status` | Check channel metadata before fetching the requested data. |
+
+Fourteen [user/profile/presence/group and own-preference operations](user-discovery.md)
+are separately audited as independent of channel content and remain available.
+Status and mute writes are still denied by read-only mode. They retain upstream profile and email
+visibility checks; free-form profile text and message-existence metadata are not
+redacted.
 
 While a channel policy is active, all other operations return
 `channel_policy_not_supported` without making an upstream call. This temporary
@@ -134,3 +141,25 @@ stops after its first denied operation, per-caller history filtering and rejecti
 of currently unsupported event registration without upstream access. This uses
 real MCP/ASGI authentication with a simulated Zulip transport; it is not live
 Zulip verification or exhaustive coverage of all tool/endpoint combinations.
+
+## Filtered event registration (in progress)
+
+With channel policies active, `register-queue` currently requires explicit
+`event_types` containing only `message` (or an empty list); `fetch_event_types`,
+when supplied, has the same restriction. Other registrations fail before network
+access. The response keeps only queue/cursor, server version/feature level,
+idle-timeout and maximum-message-ID metadata, removing unrelated initial state.
+Malformed cursor responses trigger deletion of a known created queue; cleanup
+failure is reported as an uncertain write. Read-only mode still denies creation.
+
+`delete-queue` is available under channel policy, subject to Zulip ownership and
+read-only enforcement. Managed queue handles retain their caller ownership checks.
+`get-events` now filters message events using current per-caller channel metadata
+and DM rules; heartbeats retain only their ID/type. Other event types return
+`channel_policy_event_not_supported` without content or a new cursor. Metadata
+lookup errors likewise fail the complete batch. The server-generated
+`policy_event_cursor` preserves the last original event ID even if every message
+was hidden. Managed polling exposes it as `next_event_id`; acknowledgement remains
+explicit on the next request. Metadata is cached only within one batch, with a
+30-second filtering deadline in addition to managed polling's outer wait limit.
+This supports message-only queues, not complete event-type/reference parity.

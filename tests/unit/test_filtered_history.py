@@ -294,3 +294,42 @@ async def test_history_rejects_invalid_or_nonadvancing_policy_bounds(bounds):
     result = await history_page(executor, CALLER, [], cursor=10)
     assert result.error["code"] == "invalid_history_response"
     assert result.data is None
+
+
+@pytest.mark.asyncio
+async def test_date_page_encodes_anchor_and_keeps_hidden_traversal_cursor():
+    def upstream(request):
+        assert request.method == "GET"
+        assert request.url.path == "/api/v1/messages"
+        assert request.url.params["anchor"] == "date"
+        assert request.url.params["anchor_date"] == "2026-10-11T10:00:00+00:00"
+        assert request.url.params["include_anchor"] == "true"
+        assert request.url.params["apply_markdown"] == "false"
+        assert request.url.params["allow_empty_topic_name"] == "true"
+        assert request.url.params["num_before"] == "1"
+        return httpx.Response(
+            200,
+            json={
+                "result": "success",
+                "messages": [
+                    {"id": 9, "type": "private", "content": "hidden"},
+                    {"id": 10, "type": "private", "content": "hidden"},
+                ],
+                "found_oldest": False,
+                "found_newest": False,
+            },
+        )
+
+    executor = Executor(channel_policy=POLICY, transport=httpx.MockTransport(upstream))
+    page = await history_page(
+        executor,
+        CALLER,
+        [],
+        limit=2,
+        anchor_date="2026-10-11T12:00:00+02:00",
+        apply_markdown=False,
+    )
+    assert page.error is None
+    assert page.data["messages"] == []
+    assert page.data["next_cursor"] == 9
+    assert page.data["exhausted"] is False
