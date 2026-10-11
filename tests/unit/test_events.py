@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from thinkhome_zulip_mcp.channel_policy import ChannelPolicy
 from thinkhome_zulip_mcp.executor import OperationResult, Principal
 
 ALICE = Principal("alice", "https://zulip.example", "alice", "synthetic")
@@ -10,6 +11,7 @@ BOB = Principal("bob", "https://zulip.example", "bob", "synthetic")
 
 class Upstream:
     def __init__(self):
+        self.channel_policy = ChannelPolicy()
         self.calls = []
         self.expired = False
         self.block = False

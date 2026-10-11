@@ -78,7 +78,10 @@ def load_document() -> dict[str, Any]:
         body = deepcopy(resolve_reference(document, definition["requestBody"]))
         content = body["content"][addition["media_type"]]
         schema = deepcopy(resolve_reference(document, content["schema"]))
-        properties = schema["properties"]
+        target = schema
+        for segment in addition.get("schema_path", []):
+            target = target[segment]
+        properties = target["properties"]
         for name, value in addition["properties"].items():
             if name in properties:
                 raise ValueError(f"Parameter overlay overwrites upstream input: {name}")
