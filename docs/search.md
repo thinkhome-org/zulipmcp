@@ -155,3 +155,8 @@ Changing credentials or email on the same local identity discards accumulated
 results with `authentication_required`; no previous caller data is returned.
 Regression: `tests/unit/test_search_rebinding.py` (12 cases, observed failing
 before the fix). Mock tests verify local isolation, not live Zulip behavior.
+
+Verification 2026-10-11: related suite 94 passed in 0.29s; full `uv run pytest`
+797 passed, 1 skipped in 830.28s. The skipped real provider test requires
+`KEYCLOAK_HOME`; independent PR #24 provider CI passed. Ruff/format, mypy,
+catalog check and wheel/sdist build passed. Fresh scoped review found no defects.
