@@ -293,6 +293,192 @@ def create_server(
         read_only_hint=False, destructive_hint=False, open_world_hint=True
     )
 
+    message_write = ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=True,
+    )
+
+    @server.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def zulip_get_message(
+        message_id: Annotated[int, Field(ge=1)],
+        apply_markdown: bool = False,
+    ) -> CallToolResult:
+        """Fetch an accessible message; raw Markdown is the default."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "get-message",
+                {
+                    "message_id": message_id,
+                    "apply_markdown": apply_markdown,
+                    "allow_empty_topic_name": True,
+                },
+            ),
+            "Message received.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_send_message(
+        stream: str | int,
+        topic: str,
+        content: str,
+    ) -> CallToolResult:
+        """Send raw Markdown to the named channel or channel ID as the caller."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "send-message",
+                {
+                    "type": "stream",
+                    "to": stream,
+                    "topic": topic,
+                    "content": content,
+                },
+            ),
+            "Message sent.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_send_direct_message(
+        recipients: Annotated[list[int] | list[str], Field(min_length=1)],
+        content: str,
+    ) -> CallToolResult:
+        """Send a DM to a nonempty list of user IDs or Zulip API email addresses."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "send-message",
+                {
+                    "type": "direct",
+                    "to": recipients,
+                    "content": content,
+                },
+            ),
+            "Direct message sent.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_edit_message(
+        message_id: Annotated[int, Field(ge=1)],
+        content: str,
+    ) -> CallToolResult:
+        """Replace raw message content using the caller's Zulip editing permissions."""
+        return _tool_result(
+            await executor.execute(
+                current_principal(),
+                "update-message",
+                {
+                    "message_id": message_id,
+                    "content": content,
+                },
+            ),
+            "Message updated.",
+        )
+
+    async def reaction(
+        operation: str,
+        message_id: int,
+        emoji_name: str,
+        emoji_code: str | None,
+        reaction_type: str | None,
+    ) -> CallToolResult:
+        arguments: dict[str, Any] = {"message_id": message_id, "emoji_name": emoji_name}
+        if emoji_code is not None:
+            arguments["emoji_code"] = emoji_code
+        if reaction_type is not None:
+            arguments["reaction_type"] = reaction_type
+        return _tool_result(
+            await executor.execute(current_principal(), operation, arguments),
+            "Reaction updated.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_add_reaction(
+        message_id: Annotated[int, Field(ge=1)],
+        emoji_name: str,
+        emoji_code: str | None = None,
+        reaction_type: Literal["unicode_emoji", "realm_emoji", "zulip_extra_emoji"]
+        | None = None,
+    ) -> CallToolResult:
+        """Add the caller's reaction; optional code/type disambiguate custom emoji."""
+        return await reaction(
+            "add-reaction", message_id, emoji_name, emoji_code, reaction_type
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_remove_reaction(
+        message_id: Annotated[int, Field(ge=1)],
+        emoji_name: str,
+        emoji_code: str | None = None,
+        reaction_type: Literal["unicode_emoji", "realm_emoji", "zulip_extra_emoji"]
+        | None = None,
+    ) -> CallToolResult:
+        """Remove the caller's reaction, with optional exact emoji code/type."""
+        return await reaction(
+            "remove-reaction", message_id, emoji_name, emoji_code, reaction_type
+        )
+
+    async def rename_topic(
+        message_id: int,
+        topic: str,
+        propagate_mode: str,
+        stream: str,
+        notify: bool,
+    ) -> CallToolResult:
+        arguments: dict[str, Any] = {
+            "message_id": message_id,
+            "topic": topic,
+            "propagate_mode": propagate_mode,
+            "send_notification_to_old_thread": notify,
+            "send_notification_to_new_thread": notify,
+        }
+        if stream:
+            lookup = await executor.execute(
+                current_principal(), "get-stream-id", {"stream": stream}
+            )
+            if lookup.error:
+                return _tool_result(lookup, "Channel lookup completed.")
+            stream_id = (
+                lookup.data.get("stream_id") if isinstance(lookup.data, dict) else None
+            )
+            if type(stream_id) is not int or stream_id < 1:
+                return _tool_result(
+                    OperationResult(
+                        lookup.request_id, error={"code": "invalid_channel_response"}
+                    ),
+                    "Channel lookup completed.",
+                )
+            arguments["stream_id"] = stream_id
+        return _tool_result(
+            await executor.execute(current_principal(), "update-message", arguments),
+            "Topic updated.",
+        )
+
+    @server.tool(annotations=message_write)
+    async def zulip_move_messages(
+        message_id: Annotated[int, Field(ge=1)],
+        topic: str,
+        stream: str = "",
+        propagate_mode: Literal[
+            "change_one", "change_later", "change_all"
+        ] = "change_one",
+    ) -> CallToolResult:
+        """Move messages to a topic/channel, notifying both source and destination."""
+        return await rename_topic(message_id, topic, propagate_mode, stream, True)
+
+    @server.tool(annotations=message_write)
+    async def zulip_resolve_topic(
+        message_id: Annotated[int, Field(ge=1)],
+        topic: str,
+        propagate_mode: Literal[
+            "change_one", "change_later", "change_all"
+        ] = "change_all",
+    ) -> CallToolResult:
+        """Rename silently; provide the full topic with or without the ✔ prefix."""
+        return await rename_topic(message_id, topic, propagate_mode, "", False)
+
     @server.tool(annotations=queue_annotations)
     async def zulip_register_events(arguments: dict[str, Any]) -> CallToolResult:
         """Register a caller-owned queue using register-queue catalog arguments."""
