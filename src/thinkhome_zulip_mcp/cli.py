@@ -14,7 +14,16 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command")
     serve = commands.add_parser("serve", help="Run an MCP transport")
     serve.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    from thinkhome_zulip_mcp.provisioning import add_commands, run
+
+    add_commands(commands)
     args = parser.parse_args()
+    if args.command in {"identity", "token", "secrets"}:
+        try:
+            run(args)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+        return
     if args.command != "serve":
         parser.print_help()
         return

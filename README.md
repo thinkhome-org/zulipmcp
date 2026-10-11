@@ -40,6 +40,12 @@ Multipart/file transfers and alternative authentication still require adapters.
 is implemented. No live Zulip or production operation has been verified; the
 process tests use a disposable local HTTP fixture.
 
+## Identity provisioning
+
+Local administrator commands now manage encrypted identities, expiring manual
+MCP tokens and offline key rotation. See [provisioning and recovery](docs/identity-provisioning.md).
+HTTP authorization and OAuth token validation are still pending.
+
 ## Development
 
 Requires Python 3.12+ and uv.

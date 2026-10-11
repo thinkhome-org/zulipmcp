@@ -1073,6 +1073,7 @@ name = "thinkhome-zulip-mcp"
 version = "0.1.0.dev0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "mcp" },
@@ -1092,6 +1093,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=50.0.2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "mcp", specifier = ">=2.3.0,<3" },

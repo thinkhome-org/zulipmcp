@@ -110,6 +110,11 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 - [ ] Ověřit souběžné HTTP klienty, ukončení session a odvolání tokenu během provozu. Popsat provisioning, rotaci a rozdíly identity/role.
 - [ ] Commit `feat: isolate users and authorize HTTP clients`; push a PR.
 
+**Partial evidence:** SQLite schema v1, Fernet-encrypted identities, expiring hashed
+manual tokens, exact OAuth mappings, offline atomic key rotation and provisioning
+CLI are implemented. HTTP request authentication, JWT validation, discovery and
+Keycloak fixtures remain pending; Task 4 is not complete.
+
 ## Úloha 5 — Binární operace a zbývající aplikační endpointy
 
 **PR:** `codex/full-api-operations`; `files.py`, doplňky katalogu/executoru a testy po API oblastech. Pokud je diff velký, rozdělit podle oblastí níže; každá má vlastní PR a test evidence.
