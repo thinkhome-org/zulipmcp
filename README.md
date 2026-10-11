@@ -1,7 +1,7 @@
 # ThinkHome Zulip MCP
 
-In development. A stdio MCP server and validated JSON/form executor are available.
-Full API coverage, multi-user HTTP and production readiness are not yet verified.
+In development. stdio and authenticated multi-user HTTP share a validated
+JSON/form executor. Full API coverage and production readiness remain unverified.
 
 The accepted scope is all callable application API operations of a pinned Zulip
 release, including audited undocumented operations, stdio, and authenticated
@@ -36,15 +36,15 @@ for explicitly audited safe reads; a `Retry-After` longer than 30 seconds is
 returned to the client without retrying earlier. Writes are never retried.
 
 Multipart/file transfers and alternative authentication still require adapters.
-`serve --transport http` currently fails explicitly until multi-user authorization
-is implemented. No live Zulip or production operation has been verified; the
-process tests use a disposable local HTTP fixture.
+No live Zulip or production operation has been verified; protocol tests use
+disposable local HTTP and ASGI fixtures.
 
 ## Identity provisioning
 
 Local administrator commands now manage encrypted identities, expiring manual
 MCP tokens and offline key rotation. See [provisioning and recovery](docs/identity-provisioning.md).
-HTTP authorization and OAuth token validation are still pending.
+Run `serve --transport http` with manual MCP tokens or external OAuth JWTs; see
+[HTTP configuration and limits](docs/http-auth.md). Real Keycloak validation is pending.
 
 ## Development
 

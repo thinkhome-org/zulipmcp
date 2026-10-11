@@ -112,8 +112,9 @@ Nastavit ochranu main: zákaz force push a smazání, změny přes PR, vyřešen
 
 **Partial evidence:** SQLite schema v1, Fernet-encrypted identities, expiring hashed
 manual tokens, exact OAuth mappings, offline atomic key rotation and provisioning
-CLI are implemented. HTTP request authentication, JWT validation, discovery and
-Keycloak fixtures remain pending; Task 4 is not complete.
+CLI are implemented. HTTP request authentication, signed JWT validation and
+resource discovery now have synthetic protocol tests. Keycloak fixtures, live
+client interoperability and alternate upstream auth remain pending; Task 4 is not complete.
 
 ## Úloha 5 — Binární operace a zbývající aplikační endpointy
 

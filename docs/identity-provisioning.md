@@ -1,7 +1,7 @@
 # Identity provisioning (development)
 
-The local CLI and encrypted store are implemented. HTTP authorization and OAuth
-JWT validation are still pending: these commands do not expose an HTTP service.
+The local CLI and encrypted store are implemented. See [HTTP authorization](http-auth.md)
+for the resource server; provisioning commands themselves do not expose a service.
 Provisioning is an administrator operation outside MCP tools. It makes no Zulip
 requests and does not prove that the provisioned credentials are valid upstream.
 
@@ -50,7 +50,7 @@ A failed output write revokes that new token. Keep the file in secret storage an
 supply it to the client securely. Revocation is idempotent. Tokens are not Zulip
 API keys and must never be forwarded to Zulip.
 
-An OAuth mapping can be provisioned ahead of the pending resource server:
+Provision an OAuth mapping for the resource server:
 
 ```sh
 thinkhome-zulip-mcp identity bind-oauth --id alice \
@@ -59,8 +59,7 @@ thinkhome-zulip-mcp identity bind-oauth --id alice \
 
 Bindings use the exact issuer and subject, never an email claim. Duplicate
 bindings cannot be reassigned silently. Binding alone does not validate or accept
-an OAuth token; signature, issuer, audience, expiry and scope verification will
-be required by the resource server.
+an OAuth token; the resource server also verifies signature, issuer, audience, expiry and scope.
 
 ## Backup, rotation and recovery
 

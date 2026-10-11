@@ -14,6 +14,8 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command")
     serve = commands.add_parser("serve", help="Run an MCP transport")
     serve.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
     from thinkhome_zulip_mcp.provisioning import add_commands, run
 
     add_commands(commands)
@@ -27,10 +29,25 @@ def main() -> None:
     if args.command != "serve":
         parser.print_help()
         return
-    if args.transport != "stdio":
-        parser.error(
-            "HTTP transport requires the pending multi-user authorization layer"
+    if args.transport == "http":
+        import uvicorn
+
+        from thinkhome_zulip_mcp.auth import authenticator_from_environment
+        from thinkhome_zulip_mcp.server import create_http_app
+
+        try:
+            app = create_http_app(authenticator_from_environment())
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level="warning",
+            access_log=False,
+            proxy_headers=False,
         )
+        return
     from thinkhome_zulip_mcp.server import create_server, principal_from_environment
 
     try:
